@@ -1,0 +1,381 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix eusoilvoc: <https://w3id.org/eusoilvoc#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix she: <https://soilwise-he.github.io/soil-health#> .
+
+eusoilvoc:EcosystemServices a skos:Concept ;
+    skos:altLabel "ecosystem service"@en ;
+    skos:narrower eusoilvoc:CulturalServices,
+        eusoilvoc:ProvisioningServices,
+        eusoilvoc:RegulatingServices,
+        eusoilvoc:SupportingServices ;
+    skos:prefLabel "ecosystem services"@en .
+
+eusoilvoc:SoilFunctions a skos:Concept ;
+    skos:altLabel "soil function"@en ;
+    skos:narrower eusoilvoc:CarbonPools,
+        eusoilvoc:ClimateRegulation,
+        eusoilvoc:FoodProduction,
+        eusoilvoc:Habitats,
+        eusoilvoc:NutrientDynamics,
+        eusoilvoc:SoilBiologicalFunctions,
+        eusoilvoc:SoilChemicalFunctions,
+        eusoilvoc:SoilPhysicalFunctions,
+        eusoilvoc:WaterPurification,
+        eusoilvoc:WaterRegulation ;
+    skos:prefLabel "soil functions"@en .
+
+eusoilvoc:SoilHealth a skos:Concept ;
+    skos:definition "Soil health is the level to which soil functions are fulfilled."@en ;
+    skos:prefLabel "soil health"@en .
+
+eusoilvoc:SoilIndicators a skos:Concept ;
+    skos:altLabel "soil indicator"@en ;
+    skos:narrower eusoilvoc:NonsoilIndicators,
+        eusoilvoc:SoilFunctionIndicators,
+        eusoilvoc:SoilStructureIndex ;
+    skos:prefLabel "soil indicators"@en .
+
+eusoilvoc:SoilOrganisms a skos:Concept ;
+    skos:altLabel "soil organism"@en ;
+    skos:narrower eusoilvoc:SoilFauna ;
+    skos:prefLabel "soil organisms"@en .
+
+eusoilvoc:SoilProperties a skos:Concept ;
+    skos:altLabel "soil property"@en ;
+    skos:narrower eusoilvoc:SoilBiologicalProperties,
+        eusoilvoc:SoilChemicophysicalProperties ;
+    skos:prefLabel "soil properties"@en .
+
+eusoilvoc:SoilThreats a skos:Concept ;
+    skos:altLabel "soil threat"@en ;
+    skos:definition [ dcterms:source <https://soilhealthbenchmarks.eu/glossary/soil-threat/> ;
+            rdf:value "Soil threats are processes that could degrade (some of) the functions of soils and the services that soils provide. Examples of soil threats are: acidification, compaction, contamination (pollution), decline in soil organic matter, decline in soil biodiversity, desertification, erosion, flooding and water logging, landslides, salinization."@en ] ;
+    skos:narrower eusoilvoc:SOCLoss,
+        eusoilvoc:SoilAcidification,
+        eusoilvoc:SoilBiodiversityLoss,
+        eusoilvoc:SoilCompaction,
+        eusoilvoc:SoilDegradation,
+        eusoilvoc:SoilErosion,
+        eusoilvoc:SoilNutrientLoss,
+        eusoilvoc:SoilPollution,
+        eusoilvoc:SoilSealing ;
+    skos:prefLabel "soil threats"@en .
+
+eusoilvoc:BiomassProductivity a skos:Concept ;
+    skos:prefLabel "biomass productivity"@en .
+
+eusoilvoc:CarbonStorageCapacity a skos:Concept ;
+    skos:prefLabel "carbon storage capacity"@en .
+
+eusoilvoc:Climate a skos:Concept ;
+    skos:prefLabel "climate"@en .
+
+eusoilvoc:ClimateRegulation a skos:Concept ;
+    skos:prefLabel "climate regulation"@en .
+
+eusoilvoc:CulturalServices a skos:Concept ;
+    skos:altLabel "cultural service"@en ;
+    skos:prefLabel "cultural services"@en .
+
+eusoilvoc:Emissions a skos:Concept ;
+    skos:altLabel "emission"@en ;
+    skos:prefLabel "emissions"@en .
+
+eusoilvoc:EnvironmentalFactors a skos:Concept ;
+    skos:altLabel "environmental factor"@en ;
+    skos:prefLabel "environmental factors"@en .
+
+eusoilvoc:ExternalFactors a skos:Concept ;
+    skos:altLabel "external factor"@en ;
+    skos:narrower eusoilvoc:Climate,
+        eusoilvoc:Emissions,
+        eusoilvoc:Inputs,
+        eusoilvoc:LandUse ;
+    skos:prefLabel "external factors"@en .
+
+eusoilvoc:FoodProduction a skos:Concept ;
+    skos:prefLabel "food production"@en .
+
+eusoilvoc:GroundwaterReproduction a skos:Concept ;
+    skos:prefLabel "groundwater reproduction"@en .
+
+eusoilvoc:HabitatProvisionCapacity a skos:Concept ;
+    skos:prefLabel "habitat provision capacity"@en .
+
+eusoilvoc:Inputs a skos:Concept ;
+    skos:altLabel "input"@en ;
+    skos:prefLabel "inputs"@en .
+
+eusoilvoc:LandUse a skos:Concept ;
+    skos:definition [ dcterms:source <https://www.eea.europa.eu/help/glossary/eea-glossary/land-use> ;
+            rdf:value "Land use corresponds to the socio-economic description (functional dimension) of areas: areas used for residential, industrial or commercial purposes, for farming or forestry, for recreational or conservation purposes, etc. Links with land cover are possible; it may be possible to infer land use from land cover and conversely. But situations are often complicated and the link is not so evident. Contrary to land cover, land use is difficult to 'observe'. For example, it is often difficult to decide if grasslands are used or not for agricultural purposes. Distinctions between land use and land cover and their definition have impacts on the development of classification systems, data collection and information systems in general."@en ],
+        [ dcterms:source <https://archive.ipcc.ch/ipccreports/sres/land_use/index.php?idp=45> ;
+            rdf:value "The total of arrangements, activities, and inputs that people undertake in a certain land cover type (FAO, 1997a; FAO/UNEP, 1999)."@en ] ;
+    skos:prefLabel "land use"@en .
+
+eusoilvoc:NonsoilIndicators a skos:Concept ;
+    skos:altLabel "non-soil indicator"@en ;
+    skos:narrower eusoilvoc:EnvironmentalFactors,
+        eusoilvoc:ExternalFactors ;
+    skos:prefLabel "non-soil indicators"@en .
+
+eusoilvoc:NutrientBufferingCapacity a skos:Concept ;
+    skos:prefLabel "nutrient buffering capacity"@en .
+
+eusoilvoc:NutrientDynamics a skos:Concept ;
+    skos:altLabel "nutrient dynamic"@en ;
+    skos:prefLabel "nutrient dynamics"@en .
+
+eusoilvoc:NutrientMobilisationCapacity a skos:Concept ;
+    skos:prefLabel "nutrient mobilisation capacity"@en .
+
+eusoilvoc:ProvisioningServices a skos:Concept ;
+    skos:altLabel "provisioning service"@en ;
+    skos:prefLabel "provisioning services"@en .
+
+eusoilvoc:RegulatingServices a skos:Concept ;
+    skos:altLabel "regulating service"@en ;
+    skos:prefLabel "regulating services"@en .
+
+eusoilvoc:SOCLoss a skos:Concept ;
+    skos:altLabel "SOC loss"@en ;
+    skos:prefLabel "soil organic carbon loss"@en .
+
+eusoilvoc:SoilSalinisation a skos:Concept ;
+    skos:broader eusoilvoc:SoilDegradation ;
+    skos:prefLabel "soil salinisation"@en .
+
+eusoilvoc:SoilAcidification a skos:Concept ;
+    skos:prefLabel "soil acidification"@en .
+
+eusoilvoc:SoilBiodiversityLoss a skos:Concept ;
+    skos:prefLabel "soil biodiversity loss"@en .
+
+eusoilvoc:SoilBiologicalDegradation a skos:Concept ;
+    skos:prefLabel "soil biological degradation"@en .
+
+eusoilvoc:SoilBiologicalFunctions a skos:Concept ;
+    skos:altLabel "soil biological function"@en ;
+    skos:prefLabel "soil biological functions"@en .
+
+eusoilvoc:SoilBiologicalProperties a skos:Concept ;
+    skos:altLabel "soil biological property"@en ;
+    skos:definition [ dcterms:source <https://www.fao.org/soils-portal/data-hub/soil-properties/biological-properties/en/> ;
+            rdf:value "This concerns soil properties related to the microbial and faunal activity in soil. These organisms include earthworms, nematodes, protozoa, fungi, bacteria and different arthropods. Soil biology plays a vital role in determining many soil characteristics, yet, being a relatively new science, much remains unknown about soil biology and about how the nature of soil is affected."@en ],
+        [ dcterms:source <https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/soil-biological-properties> ;
+            rdf:value "Soil biological properties refer to the biological components in the soil, including microbial life such as bacterial and fungal colonies, which are affected by changes in soil chemical and physical properties, such as acidity and organic matter content. These properties can be assessed through indicators like enzyme activities, which vary with management practices and land use."@en ] ;
+    skos:prefLabel "soil biological properties"@en .
+
+eusoilvoc:SoilChemicalDegradation a skos:Concept ;
+    skos:prefLabel "soil chemical degradation"@en .
+
+eusoilvoc:SoilChemicalFunctions a skos:Concept ;
+    skos:altLabel "soil chemical function"@en ;
+    skos:prefLabel "soil chemical functions"@en .
+
+eusoilvoc:SoilChemicalProperties a skos:Concept ;
+    skos:altLabel "soil chemical property"@en ;
+    skos:broader eusoilvoc:SoilChemicophysicalProperties ;
+    skos:definition [ dcterms:source <https://soilhealthnexus.org/resources/soil-properties/soil-chemical-properties/> ;
+            rdf:value "Chemical properties of soils include the following aspects: inorganic matters of soil, organic matters in soil, colloidal properties of soil particles and soil reactions and buffering action in acidic soils and basic soils."@en ],
+        [ dcterms:source <https://www.sciencedirect.com/topics/earth-and-planetary-sciences/soil-chemical-property> ;
+            rdf:value "Soil chemical properties refer to the chemical attributes of soil that influence its ability to supply nutrients to plants, retain harmful elements, and affect plant growth and microbial populations. These properties include nutrient concentrations, pH levels, and the presence of elements such as nitrogen, phosphorus, and potassium, which are critical for soil quality assessment and agricultural productivity."@en ] ;
+    skos:prefLabel "soil chemical properties"@en .
+
+eusoilvoc:SoilChemicophysicalProperties skos:broader eusoilvoc:SoilProperties ;
+    skos:narrower eusoilvoc:SoilChemicalProperties,
+        eusoilvoc:SoilPhysicalProperties .
+
+eusoilvoc:SoilCompaction a skos:Concept ;
+    skos:prefLabel "soil compaction"@en .
+
+eusoilvoc:SoilDegradation a skos:Concept ;
+    skos:narrower eusoilvoc:SoilSalinisation,
+        eusoilvoc:SoilBiologicalDegradation,
+        eusoilvoc:SoilChemicalDegradation,
+        eusoilvoc:SoilEcologicalDegradation,
+        eusoilvoc:SoilPhysicalDegradation ;
+    skos:prefLabel "soil degradation"@en .
+
+eusoilvoc:SoilEcologicalDegradation a skos:Concept ;
+    skos:prefLabel "soil ecological degradation"@en .
+
+eusoilvoc:SoilErosion a skos:Concept ;
+    skos:exactMatch she:SoilErosion ;
+    skos:narrower eusoilvoc:AnthropogenicErosion,
+        eusoilvoc:WaterErosion,
+        eusoilvoc:WindErosion ;
+    skos:prefLabel "soil erosion"@en .
+
+eusoilvoc:SoilFauna a skos:Concept ;
+    skos:narrower eusoilvoc:SoilMacrofauna,
+        eusoilvoc:SoilMesofauna,
+        eusoilvoc:SoilMicrofauna ;
+    skos:prefLabel "soil fauna"@en .
+
+eusoilvoc:SoilFunctionIndicators a skos:Concept ;
+    skos:altLabel "soil function indicator"@en ;
+    skos:narrower eusoilvoc:BiomassProductivity,
+        eusoilvoc:CarbonStorageCapacity,
+        eusoilvoc:GroundwaterReproduction,
+        eusoilvoc:HabitatProvisionCapacity,
+        eusoilvoc:NutrientBufferingCapacity,
+        eusoilvoc:NutrientMobilisationCapacity,
+        eusoilvoc:SoilMoistureDeficit,
+        eusoilvoc:WaterStorageCapacity ;
+    skos:prefLabel "soil function indicators"@en .
+
+eusoilvoc:SoilMacrofauna a skos:Concept ;
+    skos:prefLabel "soil macrofauna"@en .
+
+eusoilvoc:SoilMicrofauna a skos:Concept ;
+    skos:prefLabel "soil microfauna"@en .
+
+eusoilvoc:SoilMoistureDeficit a skos:Concept ;
+    skos:prefLabel "soil moisture deficit"@en .
+
+eusoilvoc:SoilNLoss a skos:Concept ;
+    skos:altLabel "soil N loss"@en ;
+    skos:prefLabel "soil nitrogen loss"@en .
+
+eusoilvoc:SoilNutrientLoss a skos:Concept ;
+    skos:narrower eusoilvoc:SoilNLoss,
+        eusoilvoc:SoilPLoss ;
+    skos:prefLabel "soil nutrient loss"@en .
+
+eusoilvoc:SoilPLoss a skos:Concept ;
+    skos:altLabel "soil P loss"@en ;
+    skos:prefLabel "soil phosphorus loss"@en .
+
+eusoilvoc:SoilPhysicalDegradation a skos:Concept ;
+    skos:prefLabel "soil physical degradation"@en .
+
+eusoilvoc:SoilPhysicalFunctions a skos:Concept ;
+    skos:altLabel "soil physical function"@en ;
+    skos:prefLabel "soil physical functions"@en .
+
+eusoilvoc:SoilPhysicalProperties a skos:Concept ;
+    skos:altLabel "soil physical property"@en ;
+    skos:broader eusoilvoc:SoilChemicophysicalProperties ;
+    skos:definition [ dcterms:source <https://www.cambridge.org/core/books/properties-and-management-of-soils-in-the-tropics/soil-physical-properties/275087D91E8849FA36F347D4964ED835> ;
+            rdf:value "Soil physical properties are those responsible for the transport of water, solutes, air and heat in the soil. The main physical soil properties are depth, temperature, texture, structure, bulk density and water-holding capacity."@en ],
+        [ dcterms:source <https://www.soils.org/publications/soils-glossary?q=publications/soils-glossary/> ;
+            rdf:value "Those characteristics, processes, or reactions of a soil that are caused by physical forces and that can be described by, or expressed in, physical terms or equations. Examples of physical properties are bulk density, hydraulic conductivity, porosity, pore-size distribution, etc."@en ],
+        [ dcterms:source <https://soilhealthnexus.org/resources/soil-properties/soil-physical-properties/> ;
+            rdf:value "Soil physical properties include both inherent and dynamic soil properties. Inherent properties include soil texture, soil parent materials and soil depth. Dynamic properties are those that can be influenced by management include infiltration, aggregate stability, available soil water holding capacity, soil organic matter, soil porosity, compaction layers, crusting, bulk density, and structure. Optimal soil physical properties reduce limitations to root growth and productivity, improve seedling emergence, nutrient and water retention, infiltration, and movement of air and water within the soil profile. Physical properties are directly related to optimal chemical and biological properties which together improve nutrient and water cycling and other key soil functions."@en ] ;
+    skos:prefLabel "soil physical properties"@en .
+
+eusoilvoc:SoilPollution a skos:Concept ;
+    skos:prefLabel "soil pollution"@en ;
+    skos:narrower eusoilvoc:SoilPollutants .
+
+eusoilvoc:SoilPollutants a skos:Concept ;
+    skos:prefLabel "soil pollutants"@en ;
+    skos:altLabel "soil contaminant"@en,
+        "soil contaminants"@en,
+        "soil pollutant"@en ;
+    skos:broader eusoilvoc:SoilPollution ;
+    skos:exactMatch she:SoilContaminants .
+
+eusoilvoc:SoilSealing a skos:Concept ;
+    skos:prefLabel "soil sealing"@en .
+
+eusoilvoc:SupportingServices a skos:Concept ;
+    skos:altLabel "supporting service"@en ;
+    skos:prefLabel "supporting services"@en .
+
+eusoilvoc:WaterPurification a skos:Concept ;
+    skos:prefLabel "water purification"@en .
+
+eusoilvoc:WaterRegulation a skos:Concept ;
+    skos:prefLabel "water regulation"@en .
+
+eusoilvoc:WaterStorageCapacity a skos:Concept ;
+    skos:prefLabel "water storage capacity"@en .
+
+eusoilvoc:SoilQuality a skos:Concept ;
+    skos:prefLabel "soil quality"@en .
+
+eusoilvoc:AnthropogenicErosion a skos:Concept ;
+    skos:broader eusoilvoc:SoilErosion ;
+    skos:exactMatch she:AnthropogenicErosion ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:narrower eusoilvoc:HarvestingErosion,
+        eusoilvoc:LivestockTramplingErosion,
+        eusoilvoc:TillageErosion ;
+    skos:prefLabel "anthropogenic erosion"@en .
+
+eusoilvoc:EphemeralGullyErosion a skos:Concept ;
+    skos:broader eusoilvoc:WaterErosion ;
+    skos:exactMatch she:EphemeralGullyErosion ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:prefLabel "ephemeral gully erosion"@en .
+
+eusoilvoc:GullyErosion a skos:Concept ;
+    skos:broader eusoilvoc:WaterErosion ;
+    skos:definition [ dcterms:source she:GullyErosion ;
+            rdf:value "Gully erosion is a special and very intense form of water erosion in areas with concentrated run-off leading to large gullies as the typical landform."@en ] ;
+    skos:exactMatch she:GullyErosion ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:prefLabel "gully erosion"@en .
+
+eusoilvoc:HarvestingErosion a skos:Concept ;
+    skos:broader eusoilvoc:AnthropogenicErosion ;
+    skos:definition [ dcterms:source she:HarvestingErosion ;
+            rdf:value "Harvesting erosion is offsite losses of soil adhering to the crop during harvest, mainly of root and tuber crops."@en ] ;
+    skos:exactMatch she:HarvestingErosion ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:prefLabel "harvesting erosion"@en .
+
+eusoilvoc:InterrillErosion a skos:Concept ;
+    skos:broader eusoilvoc:WaterErosion ;
+    skos:exactMatch she:InterrillErosion ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:prefLabel "interrill erosion"@en .
+
+eusoilvoc:LivestockTramplingErosion a skos:Concept ;
+    skos:broader eusoilvoc:AnthropogenicErosion ;
+    skos:definition [ dcterms:source she:LivestockTramplingErosion ;
+            rdf:value "Erosion caused by livestock trampling is onsite soil loss occurring after soil compaction, overgrazing and removal or reduction of vegetation cover."@en ] ;
+    skos:exactMatch she:LivestockTramplingErosion ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:prefLabel "livestock trampling erosion"@en .
+
+eusoilvoc:PipingErosion a skos:Concept ;
+    skos:broader eusoilvoc:WaterErosion ;
+    skos:exactMatch she:PipingErosion ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:prefLabel "piping erosion"@en .
+
+eusoilvoc:RillErosion a skos:Concept ;
+    skos:broader eusoilvoc:WaterErosion ;
+    skos:exactMatch she:RillErosion ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:prefLabel "rill erosion"@en .
+
+eusoilvoc:TillageErosion a skos:Concept ;
+    skos:broader eusoilvoc:AnthropogenicErosion ;
+    skos:exactMatch she:TillageErosion ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:prefLabel "tillage erosion"@en .
+
+eusoilvoc:WaterErosion a skos:Concept ;
+    skos:altLabel "soil erosion by water"@en ;
+    skos:broader eusoilvoc:SoilErosion ;
+    skos:exactMatch she:SoilErosionByWater ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:narrower eusoilvoc:EphemeralGullyErosion,
+        eusoilvoc:GullyErosion,
+        eusoilvoc:InterrillErosion,
+        eusoilvoc:PipingErosion,
+        eusoilvoc:RillErosion ;
+    skos:prefLabel "water erosion"@en .
+
+eusoilvoc:WindErosion a skos:Concept ;
+    skos:altLabel "soil erosion by wind"@en ;
+    skos:broader eusoilvoc:SoilErosion ;
+    skos:exactMatch she:SoilErosionByWind ;
+    skos:inScheme <https://w3id.org/eusoilvoc> ;
+    skos:prefLabel "wind erosion"@en .

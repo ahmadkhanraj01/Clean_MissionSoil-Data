@@ -1,0 +1,13 @@
+soilvoc_id                                     , name                    , concepts_in_branch, records, records_all_parents, records_with_inside, note
+https://w3id.org/eusoilvoc#SoilPollution       , soil pollution          ,                 22,     392,                 392,                 407, 
+https://w3id.org/eusoilvoc#SoilDegradation     , soil degradation        ,                  7,     234,                 345,                 234, "undercounted: all parents adds soil compaction, soil salinization, soil sealing"
+https://w3id.org/eusoilvoc#SoilErosion         , soil erosion            ,                 20,     227,                 227,                 236, 
+https://w3id.org/eusoilvoc#SoilCompaction      , soil compaction         ,                  1,     115,                 115,                 115, 
+https://w3id.org/eusoilvoc#SoilSealing         , soil sealing            ,                  3,      80,                  80,                  80, 
+https://w3id.org/eusoilvoc#SoilBiodiversityLoss, soil biodiversity loss  ,                  1,      36,                  36,                  36, 
+https://w3id.org/eusoilvoc#SoilAcidification   , soil acidification      ,                  1,      31,                  31,                  31, 
+https://w3id.org/eusoilvoc#SOCLoss             , soil organic carbon loss,                  1,      20,                  20,                  20, 
+https://w3id.org/eusoilvoc#SoilNutrientLoss    , soil nutrient loss      ,                  3,      15,                  15,                  15, 
+https://w3id.org/eusoilvoc#Waterlogging        , waterlogging            ,                  1,      14,                  14,                  14, 
+https://w3id.org/eusoilvoc#SoilDeficiencies    , soil deficiencies       ,                  2,       0,                   0,                   0, "no records, hide"
+https://w3id.org/eusoilvoc#SoilThreats         , soil threats (general)  ,                  1,      75,                  75,                  78, tagged only soil threats: no specific value returns these

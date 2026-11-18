@@ -1,0 +1,105 @@
+"""Shared DB helpers for the harvesters (from msp-harvester/utils/database.py)."""
+import json, os, psycopg2
+from pathlib import Path
+from datetime import datetime
+
+
+# .env loading and variable-name normalisation live in common/db.py
+from common.db import get_connection  # noqa: E402
+
+
+def reset(source):
+    dbQuery("delete from harvest.items where source=%s", (source), False)
+    print(f'{source} has been reset')
+
+
+def dbInit():
+    return get_connection()
+
+
+def insQry(table, values, cur):
+    """
+    An insert query on an open connection.
+    :param table: the table to insert to (including schema)
+    :param values: a dict of key-value, mind that key should match database field name
+    :param cur: a database cursor
+    """
+    sql = f"""INSERT INTO {table} (
+        {', '.join(values.keys())}
+    ) VALUES (
+        {','.join(['%s' for x in range(len(values.keys()))])}
+    ) ON CONFLICT DO NOTHING;"""
+    return cur.execute(sql, list(values.values()))
+
+
+def dbQuery(sql, params=(), hasoutput=True):
+    dbconn = dbInit()
+    try:
+        cursor = dbconn.cursor()
+        cursor.execute(sql, params)
+        if hasoutput:
+            return cursor.fetchall()
+        else:
+            dbconn.commit()
+    except Exception as e:
+        print(f"DB Error: {str(e)}, {sql}")
+    finally:
+        dbconn.close()
+
+
+def dbUQuery(sql):
+    dbconn = dbInit()
+    try:
+        cursor = dbconn.cursor()
+        cursor.execute(sql)
+        dbconn.commit()
+    except Exception as e:
+        print(f"DBU Error: {str(e)}, {sql}")
+    finally:
+        dbconn.close()
+
+
+def insertRecord(identifier, resulttype, resultobject, hashcode, source,
+                 title="", language="", date="", itemtype="", uri="",
+                 identifiertype="", project=""):
+    # todo: check existing before enter?
+    insertSQL(
+        'harvest.items',
+        ['identifier', 'identifiertype', 'uri', 'resultobject', 'resulttype',
+         'hash', 'source', 'insert_date', 'itemtype', 'title', 'language', 'date', 'project'],
+        (identifier, identifiertype, uri, resultobject, resulttype,
+         hashcode, source, datetime.now(), itemtype, title, language, date, project)
+    )
+    # add for duplicate check
+    insertSQL(
+        'harvest.item_duplicates',
+        ['identifier', 'identifiertype', 'source', 'hash'],
+        (identifier, identifiertype, source, hashcode)
+    )
+
+
+def insertSQL(table, fields, values):
+    sql = (f"INSERT INTO {table} ({', '.join(fields)}) "
+           f"values ({','.join(['%s' for x in range(len(fields))])}) "
+           f"ON CONFLICT DO NOTHING;")
+    dbconn = dbInit()
+    with dbconn.cursor() as cur:
+        try:
+            cur.execute(sql, values)
+            dbconn.commit()
+        except Exception as e:
+            print(f"Error: {str(e)}")
+        finally:
+            dbconn.close()
+
+
+def hasSource(label, url='', filter='', type=''):
+    # check if source is in sources table
+    sources = dbQuery(f"select name from harvest.sources where name = upper('{label}')")
+    if not len(sources) and len(sources) < 1:
+        print(f'Add non existing source {label}')
+        dbQuery(
+            f"insert into harvest.sources (name,url,filter,type) values (upper(%s),%s,%s,%s)",
+            (label, url, filter[:200], type),
+            False
+        )

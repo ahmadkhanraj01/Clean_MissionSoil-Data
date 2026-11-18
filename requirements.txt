@@ -1,0 +1,13 @@
+# Clean_MissionSoil-Data — runtime dependencies (derived from the imports in this repo)
+psycopg2-binary>=2.9.9
+python-dotenv>=1.0.0
+requests>=2.31.0
+httpx>=0.25.0          # harvest_eucap_practice_abstracts.py
+beautifulsoup4>=4.12.0
+pyyaml>=6.0.1
+pandas>=2.0.0          # Resource_Types scripts
+tqdm>=4.66.0
+playwright>=1.40.0     # EU-FarmBook harvesters; then run: playwright install chromium
+rdflib>=7.0            # Augmentation/SoilVoc (reads SoilVoc.ttl)
+ftfy>=6.0              # Augmentation/Backfill/cleanup (mojibake repair)
+# pg_dump (PostgreSQL client) is also required by Migration/migrate_validate_to_metadata.py

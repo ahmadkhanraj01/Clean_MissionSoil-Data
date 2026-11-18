@@ -1,0 +1,37 @@
+{
+  "_comment": "Canonical source name -> spellings that mean the same source. Matching ignores case, spaces, http(s)://, www. and a trailing slash, so list only real variants (typos, other names). Used by common/sources.py when the harmonizer writes validate.sources.",
+  "data.europa.eu": [
+    "data.erupa.eu",
+    "data.eroupa.eu",
+    "data.europa.eu by soil",
+    "data.europa.eu/soil",
+    "european data portal",
+    "eu open data portal"
+  ],
+  "eufarmbook": [
+    "eu-farmbook",
+    "eu farmbook",
+    "eufarmbook.eu"
+  ],
+  "openaire": [
+    "openaire explore",
+    "explore.openaire.eu"
+  ],
+  "cordis": [
+    "cordis.europa.eu"
+  ],
+  "eea": [
+    "european environment agency",
+    "eea.europa.eu"
+  ],
+  "fao": [
+    "fao.org"
+  ],
+  "isric": [
+    "isric.org"
+  ],
+  "inspire": [
+    "inspire-geoportal.ec.europa.eu",
+    "inspire geoportal"
+  ]
+}

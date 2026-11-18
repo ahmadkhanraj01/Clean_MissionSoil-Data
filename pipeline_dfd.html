@@ -1,0 +1,880 @@
+<title>MissionSoil Pipeline Data Flow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a single reading column. Overview DFD first, then one mini-DFD row per step (inputs -> script -> outputs), then a table index. */
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --fg: #1d2420;
+  --muted: #5d6862;
+  --line: #d9dfdb;
+  --accent: #2f6b4f;
+  --ext: #55606b;      --ext-bg: #eef0f3;
+  --harvest: #9a5b12;  --harvest-bg: #fbf1e3;
+  --validate: #0e6e74; --validate-bg: #e3f3f3;
+  --metadata: #4b4fa8; --metadata-bg: #ececfa;
+  --file: #6a6a3a;     --file-bg: #f3f3e6;
+  --dim: 0.28;
+  --font-display: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --surface: #1c2320; --fg: #e4ebe7; --muted: #9aa7a0; --line: #2f3a35; --accent: #7cc5a0;
+    --ext: #b5bfca; --ext-bg: #262c33;
+    --harvest: #f0b866; --harvest-bg: #34281a;
+    --validate: #6fd3d8; --validate-bg: #15302f;
+    --metadata: #a9adf5; --metadata-bg: #24264a;
+    --file: #cfcf8f; --file-bg: #2c2c1d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1c2320; --fg: #e4ebe7; --muted: #9aa7a0; --line: #2f3a35; --accent: #7cc5a0;
+  --ext: #b5bfca; --ext-bg: #262c33;
+  --harvest: #f0b866; --harvest-bg: #34281a;
+  --validate: #6fd3d8; --validate-bg: #15302f;
+  --metadata: #a9adf5; --metadata-bg: #24264a;
+  --file: #cfcf8f; --file-bg: #2c2c1d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+}
+.wrap {
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 64px;
+  display: flex; flex-direction: column; gap: 44px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(28px, 4.4vw, 40px); line-height: 1.1; }
+h2 { font-size: 22px; }
+h3 { font-size: 15px; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0; word-break: break-word; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.92em; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+header { display: flex; flex-direction: column; gap: 12px; }
+header p { color: var(--muted); }
+.layers { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--font-mono); font-size: 13px; margin-top: 6px; }
+.layers .arrow { color: var(--muted); }
+
+section { display: flex; flex-direction: column; gap: 16px; }
+.section-head { display: flex; flex-direction: column; gap: 6px; }
+.section-head p { color: var(--muted); }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 13px; color: var(--muted); align-items: center; }
+.legend > span { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Chips: DFD notation */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.3;
+  padding: 4px 9px; border: 1px solid transparent; color: var(--fg);
+  max-width: 100%; word-break: break-word; text-align: left;
+  background: none; cursor: default;
+}
+button.chip { cursor: pointer; }
+button.chip:hover { filter: brightness(0.97); outline: 1px solid currentColor; outline-offset: 1px; }
+button.chip:focus-visible, .filters button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* external entity: solid box */
+.k-ext { background: var(--ext-bg); border-color: var(--ext); color: var(--fg); border-radius: 2px; }
+/* data store: open-ended box (top, bottom, left bar) */
+.k-harvest, .k-validate, .k-metadata {
+  border-top-color: currentColor; border-bottom-color: currentColor; border-left: 4px solid currentColor; border-right: none; border-radius: 0;
+}
+.k-harvest { background: var(--harvest-bg); color: var(--harvest); }
+.k-validate { background: var(--validate-bg); color: var(--validate); }
+.k-metadata { background: var(--metadata-bg); color: var(--metadata); }
+.k-harvest span, .k-validate span, .k-metadata span { color: var(--fg); }
+/* file on disk: dashed */
+.k-file { background: var(--file-bg); border: 1px dashed var(--file); color: var(--fg); border-radius: 2px; }
+.chip .tag { font-size: 10.5px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-body); font-weight: 600; }
+.proc-swatch { display: inline-block; width: 22px; height: 14px; border-radius: 8px; border: 2px solid var(--accent); background: var(--surface); }
+
+/* Overview diagram */
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+.dfd-src { display: none; }
+.dfd-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.dfd-toolbar button {
+  font: 500 13px var(--font-body); min-width: 34px; height: 32px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer;
+}
+.dfd-toolbar button:hover { border-color: var(--accent); }
+.dfd-toolbar button:focus-visible, .dfd-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dfd-toolbar .zoom-level { font: 12px var(--font-mono); color: var(--muted); min-width: 44px; text-align: center; }
+.dfd-toolbar .hint { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+.dfd-view { position: relative; height: clamp(360px, 64vh, 760px); cursor: grab; touch-action: pan-y; user-select: none; }
+.dfd-view.dragging { cursor: grabbing; }
+.dfd-view svg { display: block; width: 100%; height: 100%; max-width: none !important; }
+.dfd-status { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; padding: 16px; text-align: center; }
+.dfd-status[hidden] { display: none; }
+/* full-screen overlay (works inside the artifact frame, where the Fullscreen API may be blocked) */
+.diagram.maxed { position: fixed; inset: 0; z-index: 50; border-radius: 0; border: 0; }
+.diagram.maxed .dfd-view { height: auto; flex: 1; touch-action: none; }
+body.dfd-lock { overflow: hidden; }
+@media (max-width: 760px) {
+  .dfd-toolbar .hint { margin-left: 0; width: 100%; }
+  .dfd-view { height: clamp(260px, 48vh, 420px); }
+}
+
+/* Filters */
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filters button {
+  font: 500 13px var(--font-body); padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer;
+}
+.filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.filter-note { font-size: 13px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.filter-note button { font: 500 13px var(--font-body); background: none; border: none; color: var(--accent); cursor: pointer; text-decoration: underline; padding: 0; }
+
+/* Stage groups and steps */
+.stage { display: flex; flex-direction: column; gap: 10px; }
+.stage-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.stage-title h2 { font-size: 19px; }
+.stage-title span { color: var(--muted); font-size: 13px; }
+.step {
+  display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1.15fr) 28px minmax(0, 1fr);
+  align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px;
+  transition: opacity 0.15s ease;
+}
+.step.dim { opacity: var(--dim); }
+.io { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
+.io .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.flow { color: var(--muted); font-size: 18px; text-align: center; user-select: none; }
+.proc {
+  border: 2px solid var(--accent); border-radius: 14px; padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.proc-top { display: flex; gap: 10px; align-items: baseline; }
+.num { font-family: var(--font-display); font-weight: 700; color: var(--accent); font-size: 15px; font-variant-numeric: tabular-nums; flex: none; }
+.folder { font-family: var(--font-mono); font-size: 12px; color: var(--muted); word-break: break-word; }
+.proc p { font-size: 13.5px; color: var(--fg); }
+.flags { display: flex; flex-wrap: wrap; gap: 4px; }
+.flags code { font-size: 11.5px; color: var(--muted); border: 1px solid var(--line); padding: 1px 6px; border-radius: 3px; }
+.warn { font-size: 12.5px; color: var(--harvest); }
+
+/* Table index */
+.tbl-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+td .refs { display: flex; flex-wrap: wrap; gap: 4px 10px; font-family: var(--font-mono); font-size: 12.5px; }
+td .refs span { white-space: nowrap; }
+td .refs b { color: var(--accent); font-weight: 500; }
+footer { color: var(--muted); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .step { grid-template-columns: minmax(0, 1fr); }
+  .flow { transform: rotate(90deg); line-height: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .step { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">MissionSoil-Data · branch mahnoor → Clean_MissionSoil-Data</div>
+    <h1>MissionSoil Pipeline Data Flow</h1>
+    <p>Every script in the pipeline, in run order, showing the source or table it reads and the database table it writes. The tables live in the PostgreSQL database from <code>.env</code> (<code>msp-kh-stage</code>), in three layers:</p>
+    <div class="layers">
+      <span class="chip k-harvest"><span>harvest.*</span></span><span class="arrow">→</span>
+      <span class="chip k-validate"><span>validate.*</span></span><span class="arrow">→</span>
+      <span class="chip k-metadata"><span>metadata.*</span></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>Overview</h2>
+      <p>The whole pipeline at layer level. The step list below gives the exact tables for each script.</p>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <span><span class="chip k-ext">source</span> External source</span>
+      <span><span class="proc-swatch"></span> Process (script)</span>
+      <span><span class="chip k-harvest"><span>table</span></span> Data store (DB table)</span>
+      <span><span class="chip k-file">file</span> File on disk</span>
+    </div>
+    <div class="diagram" id="dfd">
+      <div class="dfd-toolbar" role="toolbar" aria-label="Diagram zoom">
+        <button type="button" id="dfdOut" aria-label="Zoom out">−</button>
+        <span class="zoom-level" id="dfdLevel" aria-live="polite">100%</span>
+        <button type="button" id="dfdIn" aria-label="Zoom in">+</button>
+        <button type="button" id="dfdFit">Fit</button>
+        <button type="button" id="dfdMax" aria-pressed="false">Full screen</button>
+        <span class="hint" id="dfdHint">Drag to move · Ctrl + scroll (or pinch in full screen) to zoom · keys + − 0</span>
+      </div>
+      <div class="dfd-view" id="dfdView" tabindex="0" aria-label="Pipeline overview diagram. Use plus and minus to zoom, arrow keys to move, 0 to fit.">
+        <div class="dfd-status" id="dfdStatus">Drawing the diagram…</div>
+      </div>
+<pre class="dfd-src" id="dfdSource">
+flowchart LR
+  subgraph SRC["External sources"]
+    esdac["ESDAC + Mission Soil Platform"]
+    efb["eufarmbook.eu"]
+    eucap["EU CAP Network portal"]
+    cordis["CORDIS SPARQL"]
+    solr["SoilWise Solr API"]
+    reg["Crossref / DataCite / OpenAlex"]
+    ogc["SoilWise OGC API"]
+  end
+
+  subgraph HARV["1 · Harvesting"]
+    s1(["harvest_esdac_projects"])
+    s2(["harvest_eufarmbook_projects"])
+    s3(["harvest_eucap_projects"])
+    s4(["harvest_cordis_project_metadata"])
+    s5(["harvest_eufarmbook_contributions"])
+    s6(["harvest_eucap_practice_abstracts"])
+    s7(["harvest_solr_records"])
+  end
+
+  hp[("harvest.projects")]
+  hi[("harvest.items")]
+  hs[("harvest.sources")]
+  paj[/"eu_cap_practice_abstracts.json"/]
+
+  s8(["enrich_missing_abstracts"])
+
+  subgraph HARM["3 · Harmonize"]
+    s9(["harmonize_projects_to_validate"])
+    s10(["harmonize_all_to_validate"])
+    s11(["insert_eucap_practices"])
+  end
+
+  val[("validate.* (12 tables)")]
+
+  subgraph CLEAN["4 · Clean + resource types"]
+    s12(["clean_stage_subjects"])
+    s12b(["clean_record_languages"])
+    s13(["clean_and_deduplicate_kh_dev"])
+    s14(["resource-type scripts (5)"])
+  end
+
+  subgraph SV["5 · SoilVoc"]
+    sv1(["04 hierarchy: levels + JSON tree"])
+    sv2(["06 keyword cleaning (CSV)"])
+    sv3(["07 create + load soilvoc"])
+    sv4(["07 build links + record rows (CSV)"])
+    sv5(["07 load_record_soilvoc"])
+  end
+  ttl[/"vocab/SoilVoc.ttl"/]
+
+  subgraph BF["6 · Backfill"]
+    bf1(["cleanup: scan + dry run + verify"])
+    bf2(["fill_abstract_from_title"])
+    bf3(["find_urls_external + build_url_column"])
+    bf4(["add_missing_distributions"])
+  end
+  oa["OpenAIRE API + record pages"]
+  diff[/"messy_cleanup_before_after.csv"/]
+  cur[/"curation/*.csv"/]
+
+  s15(["migrate_validate_to_metadata"])
+  meta[("metadata.*")]
+
+  esdac --> s1 --> hp
+  efb --> s2 --> hp
+  eucap --> s3
+  cordis --> s3
+  s3 --> hp
+  s3 --> hi
+  hp --> s4
+  cordis --> s4
+  s4 --> hi
+  s4 --> hs
+  hp --> s5
+  efb --> s5
+  s5 --> hi
+  hp --> s6
+  eucap --> s6
+  s6 --> paj
+  solr --> s7 --> hi
+  reg --> s8
+  hi --> s8
+  s8 --> hi
+  hp --> s9
+  hi --> s9
+  hi --> s10
+  paj --> s11
+  s9 --> val
+  s10 --> val
+  s11 --> val
+  val --> s12 --> val
+  lang[/"language_recovered.csv"/] --> s12b
+  val --> s12b --> val
+  val --> s13 --> val
+  ogc --> s14
+  val --> s14 --> val
+  ttl --> sv1
+  ttl --> sv3
+  val --> sv2
+  cur --> sv2
+  sv1 --> sv2
+  sv3 --> val
+  sv2 --> sv4
+  val --> sv4
+  sv4 --> sv5 --> val
+  val --> bf1 --> diff
+  val --> bf2 --> val
+  oa --> bf3
+  val --> bf3 --> val
+  val --> bf4 --> val
+  val --> s15 --> meta
+</pre>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+
+const box = document.getElementById("dfd");
+const view = document.getElementById("dfdView");
+const status = document.getElementById("dfdStatus");
+const level = document.getElementById("dfdLevel");
+const src = document.getElementById("dfdSource").textContent;
+let svg = null, base = null, vb = null, fitWidth = 1, renders = 0;
+
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+async function draw() {
+  const v = {
+    fontFamily: css("--font-mono"), fontSize: "12px",
+    background: css("--surface"), primaryColor: css("--surface"), primaryTextColor: css("--fg"),
+    primaryBorderColor: css("--accent"), lineColor: css("--muted"), textColor: css("--fg"),
+    secondaryColor: css("--bg"), tertiaryColor: css("--bg"),
+    clusterBkg: css("--bg"), clusterBorder: css("--line"), edgeLabelBackground: css("--surface"),
+  };
+  mermaid.initialize({ startOnLoad: false, theme: "base", themeVariables: v, securityLevel: "strict",
+                       flowchart: { useMaxWidth: false, htmlLabels: true, curve: "basis" } });
+  try {
+    const { svg: markup } = await mermaid.render("dfdSvg" + (++renders), src);
+    view.querySelectorAll("svg").forEach(s => s.remove());
+    view.insertAdjacentHTML("beforeend", markup);
+    svg = view.querySelector("svg");
+    svg.removeAttribute("width"); svg.removeAttribute("height"); svg.style.maxWidth = "none";
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    const [x, y, w, h] = svg.getAttribute("viewBox").split(/[\s,]+/).map(Number);
+    base = { x, y, w, h };
+    status.hidden = true;
+    fit();
+  } catch (e) {
+    status.hidden = false;
+    status.textContent = "The diagram could not be drawn here. The step list below has the same information.";
+  }
+}
+
+function apply() {
+  if (!svg) return;
+  svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  level.textContent = Math.round((fitWidth / vb.w) * 100) + "%";   // 100% = Fit
+}
+// width of the viewBox when the whole diagram fits the frame
+function fitW() {
+  const r = view.getBoundingClientRect();
+  return Math.max(base.w, base.h * (r.width / Math.max(r.height, 1)));
+}
+function fit() {
+  if (!base) return;
+  const r = view.getBoundingClientRect(), aspect = r.width / Math.max(r.height, 1);
+  let w = base.w, h = base.h;
+  if (w / h > aspect) h = w / aspect; else w = h * aspect;
+  const pad = 0.03;
+  vb = { x: base.x - (w - base.w) / 2 - w * pad, y: base.y - (h - base.h) / 2 - h * pad, w: w * (1 + 2 * pad), h: h * (1 + 2 * pad) };
+  fitWidth = vb.w;
+  apply();
+}
+// client point -> diagram coordinates
+function toSvg(cx, cy) {
+  const r = view.getBoundingClientRect();
+  const s = Math.max(vb.w / r.width, vb.h / r.height);          // diagram units per pixel (meet)
+  const ox = (r.width - vb.w / s) / 2, oy = (r.height - vb.h / s) / 2;
+  return { x: vb.x + (cx - r.left - ox) * s, y: vb.y + (cy - r.top - oy) * s, s };
+}
+function zoom(f, cx, cy) {
+  if (!vb) return;
+  const r = view.getBoundingClientRect();
+  if (cx === undefined) { cx = r.left + r.width / 2; cy = r.top + r.height / 2; }
+  const minW = fitWidth / 8, maxW = fitWidth * 1.5;          // 67% .. 800% of Fit
+  const nw = Math.min(maxW, Math.max(minW, vb.w / f));
+  f = vb.w / nw;
+  const p = toSvg(cx, cy);
+  vb = { x: p.x - (p.x - vb.x) / f, y: p.y - (p.y - vb.y) / f, w: vb.w / f, h: vb.h / f };
+  apply();
+}
+function pan(dxPx, dyPx) {
+  const { s } = toSvg(0, 0);
+  vb.x -= dxPx * s; vb.y -= dyPx * s; apply();
+}
+
+document.getElementById("dfdIn").onclick = () => zoom(1.25);
+document.getElementById("dfdOut").onclick = () => zoom(1 / 1.25);
+document.getElementById("dfdFit").onclick = fit;
+const maxBtn = document.getElementById("dfdMax");
+function setMax(on) {
+  box.classList.toggle("maxed", on);
+  document.body.classList.toggle("dfd-lock", on);
+  maxBtn.setAttribute("aria-pressed", String(on));
+  maxBtn.textContent = on ? "Close full screen" : "Full screen";
+  requestAnimationFrame(fit);
+  if (on) view.focus();
+}
+maxBtn.onclick = () => setMax(!box.classList.contains("maxed"));
+
+view.addEventListener("wheel", (e) => {
+  if (!(e.ctrlKey || e.metaKey || box.classList.contains("maxed"))) return;   // plain scroll keeps scrolling the page
+  e.preventDefault();
+  zoom(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)), e.clientX, e.clientY);
+}, { passive: false });
+
+// drag to pan (mouse/pen always; touch in full screen), two fingers to pinch-zoom (full screen)
+const pts = new Map(); let pinch = null;
+view.addEventListener("pointerdown", (e) => {
+  if (!svg || (e.pointerType === "touch" && !box.classList.contains("maxed"))) return;
+  if (e.button > 0) return;
+  view.setPointerCapture(e.pointerId);
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  view.classList.add("dragging");
+  if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); }
+});
+view.addEventListener("pointermove", (e) => {
+  const prev = pts.get(e.pointerId); if (!prev) return;
+  const cur = { x: e.clientX, y: e.clientY };
+  if (pts.size === 1) pan(cur.x - prev.x, cur.y - prev.y);
+  pts.set(e.pointerId, cur);
+  if (pts.size === 2 && pinch) {
+    const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+    zoom(d / pinch, (a.x + b.x) / 2, (a.y + b.y) / 2); pinch = d;
+  }
+});
+const end = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) view.classList.remove("dragging"); };
+view.addEventListener("pointerup", end); view.addEventListener("pointercancel", end);
+view.addEventListener("dblclick", (e) => zoom(e.shiftKey ? 1 / 1.6 : 1.6, e.clientX, e.clientY));
+
+view.addEventListener("keydown", (e) => {
+  const step = 60, k = e.key;
+  if (k === "+" || k === "=") zoom(1.25);
+  else if (k === "-" || k === "_") zoom(1 / 1.25);
+  else if (k === "0") fit();
+  else if (k === "ArrowLeft") pan(step, 0); else if (k === "ArrowRight") pan(-step, 0);
+  else if (k === "ArrowUp") pan(0, step); else if (k === "ArrowDown") pan(0, -step);
+  else if (k === "Escape" && box.classList.contains("maxed")) setMax(false);
+  else return;
+  e.preventDefault();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && box.classList.contains("maxed")) setMax(false); });
+
+new ResizeObserver(() => { if (vb) apply(); }).observe(view);
+const mq = matchMedia("(prefers-color-scheme: dark)");
+mq.addEventListener?.("change", draw);
+new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+draw();
+</script>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Steps</h2>
+      <p>Read each row left to right: what the script reads, the script itself (with its folder in Clean_MissionSoil-Data), and what it writes. Click any table or file to highlight every step that touches it.</p>
+    </div>
+    <div class="filters" role="group" aria-label="Filter by stage" id="stageFilters"></div>
+    <div class="filter-note" id="filterNote" hidden></div>
+    <div id="steps" style="display:flex;flex-direction:column;gap:28px"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Table index</h2>
+      <p>For each table and file: which steps write it and which steps read it. The numbers match the steps above.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Table / file</th><th>Written by</th><th>Read by</th></tr></thead>
+        <tbody id="index"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Built from the scripts on branch <code>mahnoor</code> (commit c9ed49c), <code>soil-vocabs/tasks</code> (steps 20–29) and <code>SoilWise_metadata_backfill</code> (steps 30–39). Folders follow CLEANUP_PLAN.md. Step numbers match <code>Pipeline/run_pipeline.py</code>.</footer>
+</div>
+
+<script>
+const E = (n) => ({ k: "ext", n });
+const H = (n) => ({ k: "harvest", n });
+const V = (n) => ({ k: "validate", n });
+const M = (n) => ({ k: "metadata", n });
+const F = (n) => ({ k: "file", n });
+
+const STAGES = [
+  { id: "setup", name: "Setup", hint: "create the validate schema" },
+  { id: "harvest", name: "Harvesting", hint: "external sources → harvest.*" },
+  { id: "augment", name: "Augmentation", hint: "fill gaps in harvest.items" },
+  { id: "harmonize", name: "Harmonize", hint: "harvest.* → validate.*" },
+  { id: "clean", name: "Cleaning", hint: "subjects, languages and duplicates in validate.*" },
+  { id: "types", name: "Resource types", hint: "fix validate.records.resource_type" },
+  { id: "soilvoc", name: "SoilVoc", hint: "SoilVoc concepts and record links in validate.* (Augmentation/SoilVoc)" },
+  { id: "backfill", name: "Backfill", hint: "text cleanup, abstracts, records.url, distributions (Augmentation/Backfill)" },
+  { id: "migrate", name: "Migration", hint: "validate.* → metadata.*" },
+];
+
+const STEPS = [
+  { n: 0, stage: "setup", script: "validate_schema.sql", folder: "Migration/",
+    does: "DDL for the validate schema: tables, foreign keys, indexes. Run once on a fresh database.",
+    reads: [], writes: [V("validate.* (all tables)")] },
+
+  { n: 1, stage: "harvest", script: "harvest_esdac_projects.py", folder: "Harvesting/Projects_Registry/",
+    does: "Scrapes the ESDAC EU-funded projects table and the Mission Soil Platform funded-projects page.",
+    reads: [E("ESDAC projects page"), E("Mission Soil Platform project hub")],
+    writes: [H("harvest.projects")], flags: ["upsert on (code, grantnr)"] },
+
+  { n: 2, stage: "harvest", script: "harvest_eufarmbook_projects.py", folder: "Harvesting/EUFarmbook/",
+    does: "Playwright scrape of Horizon 2020 / Horizon Europe projects. Picks the best grant ID from the DOI 10.3030/… or the CORDIS URL.",
+    reads: [E("eufarmbook.eu /en/projects")],
+    writes: [H("harvest.projects")], flags: ["source='EU-FarmBook'", "--max", "--no-headless"],
+    warn: "The docstring shows --scrape, but that flag no longer exists." },
+
+  { n: 3, stage: "harvest", script: "harvest_eucap_projects.py", folder: "Harvesting/EUCAP/",
+    does: "Scrapes EU CAP project pages with keywords, resolves acronym, grant and CORDIS URL, then queries CORDIS for partners, abstract and dates.",
+    reads: [E("EU CAP Network portal"), E("CORDIS SPARQL"), F("data/eucap_*.json (seed fallback)")],
+    writes: [H("harvest.projects"), H("harvest.items")], flags: ["MCF YAML", "--scrape", "--skip-cordis", "--dry-run", "--limit"] },
+
+  { n: 4, stage: "harvest", script: "harvest_cordis_project_metadata.py", folder: "Harvesting/CORDIS/",
+    does: "Takes every grant number in harvest.projects and fetches the CORDIS project metadata in batches of 10.",
+    reads: [H("harvest.projects"), E("CORDIS SPARQL")],
+    writes: [H("harvest.items"), H("harvest.sources")], flags: ["MCF YAML", "source='CORDIS'"] },
+
+  { n: 5, stage: "harvest", script: "harvest_eufarmbook_contributions.py", folder: "Harvesting/EUFarmbook/",
+    does: "Opens each EU-FarmBook project's Contributions tab and every contribution page, then converts each one to schema.org.",
+    reads: [H("harvest.projects"), E("eufarmbook.eu contributions")],
+    writes: [H("harvest.items")], flags: ["schema.org", "itemtype='contribution'", "--max-projects"] },
+
+  { n: 6, stage: "harvest", script: "harvest_eucap_practice_abstracts.py", folder: "Harvesting/EUCAP/",
+    does: "Polite crawl of all EU CAP Practice Abstracts, each matched to a project in the database.",
+    reads: [H("harvest.projects"), E("EU CAP Network portal")],
+    writes: [F("data/eu_cap_practice_abstracts.json")], flags: ["resume checkpoints", "429 cooldown"],
+    warn: "Writes a JSON file instead of harvest.items. The plan moves this into harvest.items." },
+
+  { n: 7, stage: "harvest", script: "harvest_solr_records.py", folder: "Harvesting/Solar_API/",
+    does: "Pages through the SoilWise Solr API and maps each record to schema.org with solr_schema_mapper.py.",
+    reads: [E("SoilWise Solr search API")],
+    writes: [H("harvest.items")], flags: ["schema.org", "MD5 hash upsert", "--batch-size", "--limit", "--dry-run"] },
+
+  { n: 8, stage: "augment", script: "enrich_missing_abstracts.py", folder: "Augmentation/Enrichment/",
+    does: "For records with a DOI and no abstract, tries Crossref, then DataCite, then OpenAlex, and patches the abstract.",
+    reads: [H("harvest.items"), E("Crossref / DataCite / OpenAlex")],
+    writes: [H("harvest.items")], flags: ["--dry-run", "--limit", "--source", "--workers"] },
+
+  { n: 9, stage: "harmonize", script: "harmonize_projects_to_validate.py", folder: "Harmonize/",
+    does: "Builds the project entities: projects from harvest.projects, plus project records, partners, keywords and links from the CORDIS items.",
+    reads: [H("harvest.projects"), H("harvest.items")],
+    writes: [V("validate.projects"), V("validate.records"), V("validate.organizations"), V("validate.record_organization"),
+             V("validate.subjects"), V("validate.record_subject"), V("validate.distributions"), V("validate.record_project")],
+    flags: ["--dry-run", "--limit"] },
+
+  { n: 10, stage: "harmonize", script: "harmonize_all_to_validate.py", folder: "Harmonize/",
+    does: "Generic harmonizer for every harvest.items row. Parses Solr JSON, schema.org and MCF YAML into the relational tables.",
+    reads: [H("harvest.items")],
+    writes: [V("validate.sources"), V("validate.records"), V("validate.subjects"), V("validate.persons"), V("validate.organizations"),
+             V("validate.distributions"), V("validate.projects"), V("validate.record_source"), V("validate.record_subject"),
+             V("validate.record_person"), V("validate.record_organization"), V("validate.record_project")],
+    flags: ["--source", "--missing-only", "--sync-distributions", "--batch-size", "--dry-run"],
+    warn: "Source names go through common/sources.py first: case, URL forms and the typos listed in common/source_aliases.json all map to one validate.sources row. Unknown look-alikes are only warned about." },
+
+  { n: 11, stage: "harmonize", script: "insert_eucap_practices.py", folder: "Harmonize/",
+    does: "Loads the practice-abstracts JSON directly into validate and links each abstract to its project.",
+    reads: [F("data/eu_cap_practice_abstracts.json"), V("validate.projects")],
+    writes: [V("validate.records"), V("validate.record_project"), V("validate.distributions")], flags: ["--dry-run"],
+    warn: "Skips the harvest layer. Not needed once step 6 writes to harvest.items." },
+
+  { n: 12, stage: "clean", script: "clean_stage_subjects.py", folder: "Augmentation/Cleanning-Scripts/",
+    does: "Cleans keywords: drops noise numbers, strips codes and HTML, splits ';' lists, merges duplicates and re-links records.",
+    reads: [V("validate.subjects"), V("validate.record_subject")],
+    writes: [V("validate.subjects"), V("validate.record_subject"), V("validate.*_backup_<timestamp>")],
+    flags: ["dry run by default", "--commit", "--dbname"] },
+
+  { n: 13, stage: "clean", script: "clean_record_languages.py", folder: "Augmentation/Cleanning-Scripts/",
+    does: "Fills in the language of records whose language is empty or 'Unknown', using recovered codes from a CSV. Commits every 100 rows and resumes where it stopped.",
+    reads: [F("data/language_recovered.csv"), V("validate.records")],
+    writes: [V("validate.records")], flags: ["only NULL / '' / 'Unknown'", "batches of 100", "resumable"],
+    warn: "New script, built from notebook 01 sections 29–30. Nothing in the repo produces language_recovered.csv. The harmonizers also default to 'en' (step 10) or 'eng' (step 9), so codes need one standard." },
+
+  { n: 14, stage: "clean", script: "clean_and_deduplicate_kh_dev.py", folder: "Augmentation/Cleanning-Scripts/",
+    does: "Merges duplicate record clusters: fills the winner's missing fields, re-points every link, deletes the losers.",
+    reads: [F("data/detected_duplicates_for_review.json"), V("validate.records")],
+    writes: [V("validate.records"), V("validate.record_source"), V("validate.record_person"), V("validate.record_organization"),
+             V("validate.record_subject"), V("validate.record_project"), V("validate.distributions")],
+    warn: "Uses unqualified table names, so it writes to whatever schema the connection's search_path points to." },
+
+  { n: 15, stage: "types", script: "fetch_soilwise_records.py", folder: "Augmentation/Resource_Types/",
+    does: "Downloads OGC catalogue records for each configured resource type.",
+    reads: [E("SoilWise OGC API")], writes: [F("data/<Type>_records.json")] },
+
+  { n: 16, stage: "types", script: "fetch_msp_kh_records.py", folder: "Augmentation/Resource_Types/",
+    does: "Exports identifier and title of every record, as the MSP side of the comparison.",
+    reads: [V("validate.records")], writes: [F("msp-kh-dev.json")],
+    warn: "CLEANUP_PLAN.md lists this as not carried over, but step 17 needs it. Keep it here." },
+
+  { n: 17, stage: "types", script: "compare_msp_vs_ogc_types.py", folder: "Augmentation/Resource_Types/",
+    does: "Matches MSP records to OGC features by ID, then link href, then a validated title, and lists the type mismatches.",
+    reads: [F("msp-kh-dev.json"), F("data/OGC_records.json")], writes: [F("data/msp_type_mismatches.csv")],
+    warn: "OGC_records.json comes from notebook 01, not from step 15." },
+
+  { n: 18, stage: "types", script: "update_resource_types_from_ogc.py", folder: "Augmentation/Resource_Types/",
+    does: "Applies the OGC type where Crossref or DataCite confirm it. Takes a backup table first.",
+    reads: [F("msp_type_mismatches_with_correct_type.csv"), V("validate.records")],
+    writes: [V("validate.records"), V("validate.records_backup_<timestamp>")], flags: ["--dry-run", "--schema"],
+    warn: "The registry-checked CSV is produced by notebook 05." },
+
+  { n: 19, stage: "types", script: "resolve_neither_and_unresolved.py", folder: "Augmentation/Resource_Types/",
+    does: "Rule-based types for the remaining 'neither' and 'unresolved' records, such as EU portal deliverables mapped to Report.",
+    reads: [F("msp_type_mismatches_with_correct_type.csv"), V("validate.records")],
+    writes: [V("validate.records"), V("validate.records_backup_<timestamp>"), F("neither_and_unresolved_resolved.csv")],
+    flags: ["--dry-run", "--schema"] },
+
+  { n: 20, stage: "soilvoc", script: "soilvoc_levels.py", folder: "Augmentation/SoilVoc/04_soilvoc_hierarchy/scripts/",
+    does: "Gives every SoilVoc concept a level and a tree parent (BFS from the 17 top concepts, label order). 1,215 in levels 1–8, 249 detached procedure codes.",
+    reads: [F("vocab/SoilVoc.ttl")], writes: [F("04/outputs/soilvoc_keywords_by_level.csv")], flags: ["files only"] },
+
+  { n: 21, stage: "soilvoc", script: "soilvoc_json.py", folder: "Augmentation/SoilVoc/04_soilvoc_hierarchy/scripts/",
+    does: "Builds the JSON tree (children, descendants, other parents) that step 29 checks the DB against.",
+    reads: [F("04/outputs/soilvoc_keywords_by_level.csv")], writes: [F("04/outputs/soilvoc_hierarchy.json")], flags: ["files only"] },
+
+  { n: 22, stage: "soilvoc", script: "clean_subjects.py", folder: "Augmentation/SoilVoc/06_keyword_cleaning/scripts/",
+    does: "Cleans and translates every subject label and matches it to SoilVoc, including terms inside longer keywords. Writes CSVs only; labels in the DB stay as they are.",
+    reads: [V("validate.subjects"), V("validate.record_subject"), V("validate.records"), F("curation/*.csv"), F("04/outputs/soilvoc_keywords_by_level.csv")],
+    writes: [F("06/outputs/subjects_cleaned.csv"), F("06/outputs/record_soilvoc.csv")], flags: ["--db 1", "read-only session"] },
+
+  { n: 23, stage: "soilvoc", script: "review_inside_keywords.py", folder: "Augmentation/SoilVoc/06_keyword_cleaning/scripts/",
+    does: "Rule-based verdict (same / narrower / wrong / unclear) for each 'SoilVoc term inside a longer keyword' pair.",
+    reads: [F("06/outputs/subjects_cleaned.csv")], writes: [F("curation/inside_keyword_review.csv")], flags: ["files only"] },
+
+  { n: 24, stage: "soilvoc", script: "create_soilvoc_tables.py", folder: "Augmentation/SoilVoc/07_populate_soilvoc_db/scripts/",
+    does: "Runs sql/create_soilvoc_tables.sql in one transaction: creates soilvoc and record_soilvoc if missing, renames the old soilvoc_types, drops the old subject_soilvoc.",
+    reads: [F("sql/create_soilvoc_tables.sql")], writes: [V("validate.soilvoc"), V("validate.record_soilvoc")], flags: ["idempotent", "stage only"],
+    warn: "No dry run: DDL. Drops validate.subject_soilvoc and an array-shaped record_soilvoc if they exist." },
+
+  { n: 25, stage: "soilvoc", script: "load_soilvoc.py", folder: "Augmentation/SoilVoc/07_populate_soilvoc_db/scripts/",
+    does: "Loads the 1,464 concepts (name, alt labels, level, tree parent) after checking the level histogram. Upsert, then parents in a second pass.",
+    reads: [F("vocab/SoilVoc.ttl")], writes: [V("validate.soilvoc"), F("07/outputs/multi_parent_concepts.csv")], flags: ["ON CONFLICT (id) DO UPDATE", "no TRUNCATE"],
+    warn: "No dry run." },
+
+  { n: 26, stage: "soilvoc", script: "build_soilvoc_links.py", folder: "Augmentation/SoilVoc/07_populate_soilvoc_db/scripts/",
+    does: "Turns the cleaned subjects into subject → concept links with a link type and lists the noise subjects. Applies keep/drop verdicts from review_sheet.csv.",
+    reads: [F("06/outputs/subjects_cleaned.csv"), F("curation/inside_keyword_review.csv"), F("07/outputs/review_sheet.csv"), V("validate.subjects"), V("validate.record_subject")],
+    writes: [F("07/outputs/dry_run_links.csv"), F("07/outputs/noise_subjects.csv")], flags: ["read-only on the DB"] },
+
+  { n: 27, stage: "soilvoc", script: "build_record_soilvoc.py", folder: "Augmentation/SoilVoc/07_populate_soilvoc_db/scripts/",
+    does: "Expands the links to one row per record and concept: the strongest link type wins, accepted beats pending.",
+    reads: [F("07/outputs/dry_run_links.csv"), V("validate.record_subject"), V("validate.soilvoc")],
+    writes: [F("07/outputs/dry_run_record_soilvoc.csv")], flags: ["read-only session"] },
+
+  { n: 28, stage: "soilvoc", script: "load_record_soilvoc.py", folder: "Augmentation/SoilVoc/07_populate_soilvoc_db/scripts/",
+    does: "One transaction: checks every concept and record exists, backs up subjects, replaces all record_soilvoc rows and marks the noise subjects (vocabulary_name = 'noise'). Labels are never changed.",
+    reads: [F("07/outputs/dry_run_record_soilvoc.csv"), F("07/outputs/noise_subjects.csv"), V("validate.soilvoc"), V("validate.records")],
+    writes: [V("validate.record_soilvoc"), V("validate.subjects"), V("validate.subjects_pre_soilvoc_backup_<timestamp>")],
+    flags: ["refuses any DB but msp-kh-stage", "rolls back on error"],
+    warn: "No dry run. DELETEs every record_soilvoc row before inserting the new ones. Rerun 22–29 after a dedup (step 14), because record_soilvoc rows are deleted with their record." },
+
+  { n: 29, stage: "soilvoc", script: "check_soilvoc_vs_json.py", folder: "Augmentation/SoilVoc/07_populate_soilvoc_db/scripts/",
+    does: "Compares levels, parents, children, descendants and multi-parent concepts in the DB with the step 21 JSON. Last result: no mismatches.",
+    reads: [V("validate.soilvoc"), F("04/outputs/soilvoc_hierarchy.json")], writes: [], flags: ["read-only session"] },
+
+  { n: 30, stage: "backfill", script: "test_url_rules.py", folder: "Augmentation/Backfill/url/",
+    does: "31 checks of the identifier → URL rules in url_rules.py before anything uses them.",
+    reads: [], writes: [], flags: ["no DB"] },
+
+  { n: 31, stage: "backfill", script: "find_messy.py", folder: "Augmentation/Backfill/cleanup/",
+    does: "Flags records whose title, abstract or raw_metadata text has emoji, pipes, backslashes, control characters, mojibake, HTML tags or irregular spacing.",
+    reads: [V("validate.records")], writes: [F("output/scan/messy_records.csv")], flags: ["SELECT only"] },
+
+  { n: 32, stage: "backfill", script: "dry_run.py", folder: "Augmentation/Backfill/cleanup/",
+    does: "Applies the cleaning rules in memory and writes a before/after diff per field, with target column / raw_metadata / both.",
+    reads: [V("validate.records")], writes: [F("output/dryrun/messy_cleanup_before_after.csv")], flags: ["SELECT only"] },
+
+  { n: 33, stage: "backfill", script: "analyse_diff.py", folder: "Augmentation/Backfill/cleanup/",
+    does: "Labels every change in the diff (html_tag, multi_space, mojibake, emoji_removed …) for review.",
+    reads: [F("output/dryrun/messy_cleanup_before_after.csv")], writes: [F("output/dryrun/messy_cleanup_changes.csv")], flags: ["files only"] },
+
+  { n: 34, stage: "backfill", script: "verify_diff.py", folder: "Augmentation/Backfill/cleanup/",
+    does: "Gate before the apply: leftover tags or mojibake, invalid targets, lost words. Exit 1 means a person must review.",
+    reads: [F("output/dryrun/messy_cleanup_before_after.csv")], writes: [], flags: ["files only"],
+    warn: "The apply (apply_cleanup.py) is manual: it needs the signed-off diff and its counts. It UPDATEs records.title, abstract and raw_metadata after a before-image and an audit." },
+
+  { n: 35, stage: "backfill", script: "fill_abstract_from_title.py", folder: "Augmentation/Backfill/abstracts/",
+    does: "Copies the title into empty, NULL or placeholder abstracts (xx, x, -, NA …). Only the abstract column changes.",
+    reads: [V("validate.records")], writes: [V("validate.records"), F("output/apply/abstract_from_title_backup_<ts>.jsonl")], flags: ["--apply", "--placeholders", "--restore"] },
+
+  { n: 36, stage: "backfill", script: "find_urls_external.py", folder: "Augmentation/Backfill/url/",
+    does: "Finds URLs the identifier rules cannot: OpenAIRE title + year match (tier D), or a record link whose page contains the title (tier E).",
+    reads: [V("validate.records"), E("OpenAIRE Graph API + record pages")], writes: [F("output/url/url_candidates_DE.csv")], flags: ["SELECT only"] },
+
+  { n: 37, stage: "backfill", script: "build_url_column.py", folder: "Augmentation/Backfill/url/",
+    does: "Derives records.url from the identifier (DOI, handle, URN, arXiv …) plus the verified tier D/E candidates, and fills only empty URLs; checks that no other column changed.",
+    reads: [V("validate.records"), F("output/url/url_candidates_DE.csv")], writes: [V("validate.records"), F("output/url/url_before_image_<ts>.csv")],
+    flags: ["--apply", "--candidates", "--refresh"],
+    warn: "--apply runs ALTER TABLE … ADD COLUMN IF NOT EXISTS url and VALIDATE CONSTRAINT, which need the table owner." },
+
+  { n: 38, stage: "backfill", script: "add_missing_distributions.py", folder: "Augmentation/Backfill/url/",
+    does: "Adds a distributions row (landing page or download) for every records.url the record does not have yet.",
+    reads: [V("validate.records"), V("validate.distributions")], writes: [V("validate.distributions"), F("output/url/missing_distributions_inserted_ids_<ts>.csv")], flags: ["--apply", "INSERT only"] },
+
+  { n: 39, stage: "backfill", script: "compare_url_accessurl.py", folder: "Augmentation/Backfill/url/",
+    does: "Compares records.url with the decoded distributions.access_url per record and writes a report.",
+    reads: [V("validate.records"), V("validate.distributions")], writes: [F("output/url/url_vs_dist_per_record.csv"), F("docs/url/url_vs_accessurl_report.md")], flags: ["SELECT only", "--http"] },
+
+  { n: 40, stage: "migrate", script: "migrate_validate_to_metadata.py", folder: "Migration/",
+    does: "Drops and rebuilds metadata from the validate DDL, then copies 16 validate tables into metadata in dependency order and checks row counts and orphans. validate is only read.",
+    reads: [V("validate.* (all tables)")], writes: [M("metadata.* (same tables)")], flags: ["skips records_backup_*"],
+    warn: "Copies only 16 tables: soilvoc, record_soilvoc, record_landcover, record_landuse and the type tables would end up empty in metadata. Do not run on stage as it is." },
+];
+
+const TAG = { ext: "src", harvest: "", validate: "", metadata: "", file: "file" };
+let activeStage = "all";
+let activeTable = null;
+
+function chip(item) {
+  const isStore = item.k !== "ext";
+  const el = document.createElement(isStore ? "button" : "span");
+  el.className = "chip k-" + item.k;
+  if (isStore) {
+    el.type = "button";
+    el.title = "Highlight steps that use " + item.n;
+    el.addEventListener("click", () => setTable(activeTable === item.n ? null : item.n));
+  }
+  const s = document.createElement("span");
+  s.textContent = item.n;
+  el.appendChild(s);
+  return el;
+}
+
+function ioCol(label, items) {
+  const col = document.createElement("div");
+  col.className = "io";
+  const l = document.createElement("div");
+  l.className = "label"; l.textContent = label;
+  col.appendChild(l);
+  if (!items.length) {
+    const none = document.createElement("span");
+    none.className = "folder"; none.textContent = "nothing";
+    col.appendChild(none);
+  }
+  items.forEach(i => col.appendChild(chip(i)));
+  return col;
+}
+
+function arrow() {
+  const a = document.createElement("div");
+  a.className = "flow"; a.setAttribute("aria-hidden", "true"); a.textContent = "→";
+  return a;
+}
+
+function renderSteps() {
+  const root = document.getElementById("steps");
+  root.innerHTML = "";
+  STAGES.forEach(st => {
+    const steps = STEPS.filter(s => s.stage === st.id);
+    const g = document.createElement("div");
+    g.className = "stage"; g.dataset.stage = st.id;
+    g.hidden = activeStage !== "all" && activeStage !== st.id;
+    const t = document.createElement("div");
+    t.className = "stage-title";
+    t.innerHTML = `<h2></h2><span></span>`;
+    t.querySelector("h2").textContent = st.name;
+    t.querySelector("span").textContent = st.hint;
+    g.appendChild(t);
+    steps.forEach(s => {
+      const row = document.createElement("article");
+      row.className = "step";
+      const touches = [...s.reads, ...s.writes].some(i => i.n === activeTable);
+      if (activeTable && !touches) row.classList.add("dim");
+      const proc = document.createElement("div");
+      proc.className = "proc";
+      proc.innerHTML = `<div class="proc-top"><span class="num"></span><h3></h3></div><div class="folder"></div><p></p>`;
+      proc.querySelector(".num").textContent = String(s.n).padStart(2, "0");
+      proc.querySelector("h3").textContent = s.script;
+      proc.querySelector(".folder").textContent = s.folder;
+      proc.querySelector("p").textContent = s.does;
+      if (s.flags && s.flags.length) {
+        const f = document.createElement("div"); f.className = "flags";
+        s.flags.forEach(x => { const c = document.createElement("code"); c.textContent = x; f.appendChild(c); });
+        proc.appendChild(f);
+      }
+      if (s.warn) {
+        const w = document.createElement("div"); w.className = "warn"; w.textContent = "⚠ " + s.warn;
+        proc.appendChild(w);
+      }
+      row.append(ioCol("Reads", s.reads), arrow(), proc, arrow(), ioCol("Writes", s.writes));
+      g.appendChild(row);
+    });
+    root.appendChild(g);
+  });
+  const note = document.getElementById("filterNote");
+  if (activeTable) {
+    const n = STEPS.filter(s => [...s.reads, ...s.writes].some(i => i.n === activeTable)).length;
+    note.hidden = false;
+    note.innerHTML = "";
+    const txt = document.createElement("span");
+    txt.innerHTML = `Highlighting <code></code>: ${n} step${n === 1 ? "" : "s"}.`;
+    txt.querySelector("code").textContent = activeTable;
+    const clear = document.createElement("button");
+    clear.type = "button"; clear.textContent = "Clear highlight";
+    clear.addEventListener("click", () => setTable(null));
+    note.append(txt, clear);
+  } else {
+    note.hidden = true;
+  }
+}
+
+function setTable(name) { activeTable = name; renderSteps(); }
+
+function renderFilters() {
+  const box = document.getElementById("stageFilters");
+  const opts = [{ id: "all", name: "All stages" }, ...STAGES];
+  opts.forEach(o => {
+    const b = document.createElement("button");
+    b.type = "button"; b.id = "stage-" + o.id; b.textContent = o.name;
+    b.setAttribute("aria-pressed", String(o.id === activeStage));
+    b.addEventListener("click", () => {
+      activeStage = o.id;
+      box.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x.id === "stage-" + o.id)));
+      renderSteps();
+    });
+    box.appendChild(b);
+  });
+}
+
+function renderIndex() {
+  const map = new Map();
+  const order = { harvest: 0, file: 3, validate: 1, metadata: 2 };
+  STEPS.forEach(s => {
+    s.writes.forEach(i => { if (i.k === "ext") return; const e = map.get(i.n) || { k: i.k, w: [], r: [] }; e.w.push(s); map.set(i.n, e); });
+    s.reads.forEach(i => { if (i.k === "ext") return; const e = map.get(i.n) || { k: i.k, w: [], r: [] }; e.r.push(s); map.set(i.n, e); });
+  });
+  const rows = [...map.entries()].sort((a, b) => (order[a[1].k] - order[b[1].k]) || a[0].localeCompare(b[0]));
+  const tb = document.getElementById("index");
+  rows.forEach(([name, e]) => {
+    const tr = document.createElement("tr");
+    const td0 = document.createElement("td"); td0.appendChild(chip({ k: e.k, n: name }));
+    const refs = (list) => {
+      const td = document.createElement("td");
+      const d = document.createElement("div"); d.className = "refs";
+      if (!list.length) { d.textContent = "none"; }
+      list.forEach(s => { const sp = document.createElement("span"); sp.innerHTML = `<b></b> `; sp.querySelector("b").textContent = s.n; sp.append(s.script); d.appendChild(sp); });
+      td.appendChild(d); return td;
+    };
+    tr.append(td0, refs(e.w), refs(e.r));
+    tb.appendChild(tr);
+  });
+}
+
+renderFilters();
+renderSteps();
+renderIndex();
+</script>

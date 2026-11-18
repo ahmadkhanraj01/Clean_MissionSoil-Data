@@ -1,0 +1,22 @@
+.env
+.env.*
+!.env.template
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+data/*
+!data/README.md
+Pipeline/logs/
+*.log
+.ipynb_checkpoints/
+.DS_Store
+.idea/
+.vscode/
+
+# Augmentation/SoilVoc: large or working files that the scripts regenerate
+Augmentation/SoilVoc/03_stage_vs_dev/outputs/field_changes.csv
+
+# Augmentation/Backfill: generated files and undo material (keep a copy of output/apply and *_before_image*/*_inserted_ids*)
+Augmentation/Backfill/output/*
+!Augmentation/Backfill/output/README.md
