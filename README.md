@@ -6,6 +6,8 @@ The cleaned MissionSoil data pipeline. It harvests soil-knowledge records into P
 external sources ──► harvest.* (raw payloads) ──► validate.* (relational, cleaned, linked) ──► metadata.* (published)
 ```
 
+**📊 Pipeline data-flow diagram (DFD): [open the interactive page](https://claude.ai/artifact/Mjc7awFNtsZ8fHSTqD4MUH)**: all 40 steps, with the tables and files each script reads and writes, and a zoomable overview. The same page is in this repo as [`pipeline_dfd.html`](pipeline_dfd.html); download it and open it in a browser.
+
 It combines three sources:
 
 | From | What | Folders here |
