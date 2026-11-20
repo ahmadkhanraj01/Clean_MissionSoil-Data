@@ -20,3 +20,6 @@ Augmentation/SoilVoc/03_stage_vs_dev/outputs/field_changes.csv
 # Augmentation/Backfill: generated files and undo material (keep a copy of output/apply and *_before_image*/*_inserted_ids*)
 Augmentation/Backfill/output/*
 !Augmentation/Backfill/output/README.md
+
+# Augmentation/Crossborder: optional 62 MB GISCO borders file (only for the non-default scopes)
+Augmentation/Crossborder/data/CNTR_*

@@ -21,11 +21,15 @@ import sys as _sys, pathlib as _pl
 _ROOT = next(p for p in _pl.Path(__file__).resolve().parents if (p / "common" / "db.py").is_file())
 if str(_ROOT) not in _sys.path:
     _sys.path.insert(0, str(_ROOT))
-from common.db import db_config  # noqa: E402
+from common.db import db_config, is_read_only  # noqa: E402
 # ----------------------------------------
 
 import argparse
+import json
+import re
+import os
 import subprocess
+import threading
 import sys
 import time
 from datetime import datetime
@@ -59,6 +63,9 @@ STEPS = [
     (15, "types",     "Augmentation/Resource_Types/fetch_soilwise_records.py",           None,                 []),
     (16, "types",     "Augmentation/Resource_Types/fetch_msp_kh_records.py",             [],                   []),
     (17, "types",     "Augmentation/Resource_Types/compare_msp_vs_ogc_types.py",         [],                   []),
+    # Step 42 (notebook 05 as a script) is listed here because it must run between 17 and 18;
+    # its number comes after the migration so the numbers 18-41 stay as documented.
+    (42, "types",     "Augmentation/Resource_Types/resolve_types_from_doi_registries.py", [],                  []),
     (18, "types",     "Augmentation/Resource_Types/update_resource_types_from_ogc.py",   [],                   ["--execute"]),
     (19, "types",     "Augmentation/Resource_Types/resolve_neither_and_unresolved.py",   [],                   ["--execute"]),
     # SoilVoc (Augmentation/SoilVoc, from soil-vocabs/tasks): runs after cleaning, because
@@ -85,7 +92,10 @@ STEPS = [
     (37, "backfill",  f"{_BF}/url/build_url_column.py",                                  ["--candidates", _DE], ["--candidates", _DE, "--apply"]),
     (38, "backfill",  f"{_BF}/url/add_missing_distributions.py",                         [],                   ["--apply"]),
     (39, "backfill",  f"{_BF}/url/compare_url_accessurl.py",                             [],                   []),
-    (40, "migrate",   "Migration/migrate_validate_to_metadata.py",                       None,                 []),
+    # Crossborder (Augmentation/Crossborder, from K2X/polygons): records.spatial bbox -> countries
+    # covered -> validate.record_crossborder. After cleaning, since rows go with their record (CASCADE).
+    (40, "spatial",   "Augmentation/Crossborder/compute_crossborder.py",                 ["--dry-run"],        []),
+    (41, "migrate",   "Migration/migrate_validate_to_metadata.py",                       None,                 []),
 ]
 # Backfill: 30-34, 36 and 39 only read the DB (and write files under Augmentation/Backfill/output, docs).
 # 34 exits 1 when the cleanup diff needs a person to review it, which stops the run (use --keep-going).
@@ -95,11 +105,18 @@ STEPS = [
 #   url/apply_source_urls.py, fix_source_urls_unescape.py, add_source_distributions.py
 #                                 one-off 2026-10-07 pass; its input CSVs are not in the repo
 #   diagnostics/*                 one-off inspectors
-# Steps 15 and 17 only read external/local files and write local files, so their
+# Steps 15, 17 and 42 only read external/local files and write local files, so their
 # "dry run" is the real run. Step 16 only reads the DB and writes a local JSON.
 # Steps 20-23, 26, 27 and 29 only read the DB (read-only sessions) and write local files.
 # Not in the runner on purpose: 07 make_review_sheet.py (rewrites review_sheet.csv and so
 # would erase verdicts people filled in), and the analysis tasks 01, 03, 05.
+
+
+# Steps that accept --limit N (a subset of records); the others are fast DB reads.
+LIMIT_STEPS = {8, 32, 36, 42}
+# Rough seconds per step for a 1,000-record run; used only for the ETA in the progress page.
+EXPECTED = {8: 500, 16: 120, 17: 60, 32: 90, 36: 300, 42: 300, 22: 30, 26: 30, 27: 30}
+DEFAULT_EXPECTED = 15
 
 
 def main():
@@ -109,6 +126,9 @@ def main():
     ap.add_argument("--stage", choices=sorted({s[1] for s in STEPS}), help="Only this stage")
     ap.add_argument("--only", type=int, nargs="+", help="Only these step numbers")
     ap.add_argument("--keep-going", action="store_true", help="Continue after a failed step")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="Use only N records in steps 8, 32, 36, 42 (the slow, API-bound ones)")
+    ap.add_argument("--timeout", type=int, default=1800, help="Seconds allowed per step (default 1800)")
     args = ap.parse_args()
 
     steps = [s for s in STEPS
@@ -131,32 +151,139 @@ def main():
 
     log_dir = _ROOT / "Pipeline" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"run_{datetime.now():%Y%m%d_%H%M%S}_{'live' if args.live else 'dry'}.log"
-    summary = []
+    stamp = f"{datetime.now():%Y%m%d_%H%M%S}_{'live' if args.live else 'dry'}"
+    log_path = log_dir / f"run_{stamp}.log"
+    report_path = log_dir / f"report_{stamp}.md"
+    secret_host = cfg.get("host") or ""
+    clean = lambda t: t.replace(secret_host, "<host>") if secret_host else t
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        tqdm = None
+    bar = tqdm(total=len(steps), unit="step", desc="pipeline", dynamic_ncols=True) if tqdm else None
+    say = (bar.write if bar else print)
+    t_start = datetime.now()
+    summary = []   # (n, script, status, seconds, detail)
+    cur_step = None
+    status_path = log_dir / "status.json"
+
+    def write_status(finished=False):
+        """Progress for Pipeline/progress_ui.py: done steps, the current one, and an ETA."""
+        exp = {n: EXPECTED.get(n, DEFAULT_EXPECTED) for n, *_ in steps}
+        done_n = {x[0] for x in summary}
+        actual = sum(x[3] for x in summary if x[2] != "SKIPPED")
+        planned = sum(exp[x[0]] for x in summary if x[2] != "SKIPPED") or 1
+        k = min(max(actual / planned, 0.3), 5)          # calibrate with how fast the done steps ran
+        left = sum(exp[n] for n, *_ in steps if n not in done_n and not (cur_step and n == cur_step[0]))
+        cur_left = 0
+        if cur_step and not finished:
+            el = time.time() - cur_step[2]
+            pr = cur_step[4]
+            if pr and pr[0] > 0:   # the step reports N/M: extrapolate from its own speed
+                cur_left = max(el * (pr[1] - pr[0]) / pr[0], 1)
+                k = 1.0 if not summary else k
+            else:
+                cur_left = max(exp[cur_step[0]] * k - el, 5)
+        status_path.write_text(json.dumps({
+            "mode": "live" if args.live else "dry run", "db": cfg["dbname"], "limit": args.limit,
+            "started": t_start.timestamp(), "now": time.time(), "finished": finished,
+            "total": len(steps), "done": len(summary),
+            "current": ({"n": cur_step[0], "name": cur_step[1], "since": cur_step[2], "line": cur_step[3],
+                         "progress": list(cur_step[4]) if cur_step[4] else None}
+                        if cur_step and not finished else None),
+            "eta_seconds": 0 if finished else round(left * k + cur_left),
+            "steps": [{"n": n, "name": sc.rsplit("/", 1)[-1], "status": st, "secs": round(t, 1)} for n, sc, st, t, _ in summary],
+            "pending": [n for n, *_ in steps if n not in done_n],
+        }), encoding="utf-8")
+    write_status()
     with open(log_path, "w", encoding="utf-8") as log:
-        for n, stage, script, dry, live in steps:
+        for i, (n, stage, script, dry, live) in enumerate(steps, 1):
+            name = script.rsplit("/", 1)[-1]
             if not args.live and dry is None:
-                summary.append((n, script, "SKIPPED (no dry-run)", 0.0))
+                summary.append((n, script, "SKIPPED", 0.0, "no dry-run mode (it would write)"))
+                write_status()
+                say(f"[{i}/{len(steps)}] step {n:>2} {name:<45} SKIPPED (no dry-run)")
+                if bar: bar.update(1)
                 continue
+            if bar: bar.set_description(f"step {n} {name}")
+            say(f"[{i}/{len(steps)}] step {n:>2} {name:<45} running ...")
             cmd = [sys.executable, str(_ROOT / script)] + (live if args.live else dry)
-            print(f"\n=== Step {n}: {script} {' '.join(cmd[2:])}")
-            log.write(f"\n=== Step {n}: {' '.join(cmd)}\n")
-            log.flush()
+            if args.limit and n in LIMIT_STEPS:
+                cmd += ["--limit", str(args.limit)]
             t0 = time.time()
-            proc = subprocess.run(cmd, cwd=_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            log.write(proc.stdout)
-            print(proc.stdout[-3000:])
-            status = "OK" if proc.returncode == 0 else f"FAILED (exit {proc.returncode})"
-            summary.append((n, script, status, time.time() - t0))
-            if proc.returncode != 0 and not args.keep_going:
+            cur_step = (n, name, t0, "", None)
+            write_status()
+            log.write(f"\n=== Step {n}: {' '.join(cmd)}\n"); log.flush()
+            # Stream the step's output live: a reader thread collects the lines, this loop keeps the
+            # status file (last line, "N/M" progress) fresh and enforces the timeout.
+            env = dict(os.environ, PYTHONUNBUFFERED="1")
+            proc = subprocess.Popen(cmd, cwd=_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    text=True, bufsize=1, env=env)
+            buf, prog, seen, lastline = [], None, 0, ""
+            reader = threading.Thread(target=lambda: [buf.append(l) for l in proc.stdout], daemon=True)
+            reader.start()
+            timed_out = False
+            while reader.is_alive():
+                reader.join(1.0)
+                if len(buf) > seen:
+                    new = clean("".join(buf[seen:])).replace("\r", "\n").splitlines()
+                    seen = len(buf)
+                    for ln in new:   # only "Progress: 300/1000", "[3/10]" or tqdm "n/m [" lines, never DOIs
+                        m = re.search(r"(?i)progress\D{0,3}(\d[\d,]*)\s*/\s*(\d[\d,]*)", ln) or \
+                            re.search(r"\[(\d+)/(\d+)\]", ln) or re.search(r"\b(\d+)/(\d+)\s*\[", ln)
+                        if m and int(m[2].replace(",", "")):
+                            prog = (int(m[1].replace(",", "")), int(m[2].replace(",", "")))
+                    shown = [x for x in new if x.strip()]
+                    if shown:
+                        lastline = shown[-1].strip()[:160]
+                    cur_step = (n, name, t0, lastline, prog)
+                write_status()
+                if time.time() - t0 > args.timeout:
+                    proc.kill(); timed_out = True; break
+            proc.wait()
+            out, rc = clean("".join(buf)), (None if timed_out else proc.returncode)
+            secs = time.time() - t0
+            log.write(out); log.flush()
+            lines = [l.strip() for l in out.splitlines() if l.strip()]
+            if rc is None:
+                status, detail = "TIMEOUT", f"stopped after {args.timeout}s"
+            elif rc == 0:
+                status, detail = "OK", (lines[-1] if lines else "")
+            elif "read-only transaction" in out or "ReadOnlySqlTransaction" in out:
+                status, detail = "OK (read-only)", "ran up to its first write, which the read-only session blocked"
+            else:
+                status = f"FAILED (exit {rc})"
+                err = [l for l in lines if re.search(r"error|exception|not found|no such|missing|Traceback", l, re.I)]
+                detail = (err[-1] if err else (lines[-1] if lines else ""))
+            detail = detail[:200].replace("|", "/")
+            summary.append((n, script, status, secs, detail))
+            say(f"[{i}/{len(steps)}] step {n:>2} {name:<45} {status}  ({secs:.1f}s)")
+            cur_step = None
+            write_status()
+            if bar: bar.update(1)
+            if status.startswith(("FAILED", "TIMEOUT")) and not args.keep_going:
                 break
+    if bar: bar.close()
+    write_status(finished=True)
+
+    good = lambda st: st.startswith("OK")
+    n_ok = sum(good(x[2]) for x in summary); n_skip = sum(x[2] == "SKIPPED" for x in summary)
+    n_bad = len(summary) - n_ok - n_skip
+    lines = [f"# Pipeline report ({'LIVE' if args.live else 'dry run'})", "",
+             f"- Database: `{cfg['dbname']}`, schema `validate`" + (" (session read-only)" if is_read_only() else ""),
+             f"- Started {t_start:%Y-%m-%d %H:%M:%S}, finished {datetime.now():%H:%M:%S}, "
+             f"total {sum(x[3] for x in summary):.0f}s",
+             f"- Steps: {len(summary)} run or listed: **{n_ok} OK**, {n_skip} skipped, **{n_bad} failed**", "",
+             "| Step | Script | Status | Time | Detail |", "|---:|---|---|---:|---|"]
+    lines += [f"| {n} | `{sc.rsplit('/', 1)[-1]}` | {st} | {t:.1f}s | {d} |" for n, sc, st, t, d in summary]
+    lines += ["", f"Full output: `{log_path.relative_to(_ROOT)}`", ""]
+    report_path.write_text("\n".join(lines), encoding="utf-8")
 
     print("\n" + "=" * 90)
-    for n, script, status, secs in summary:
+    for n, script, status, secs, _ in summary:
         print(f"  {n:>2}  {status:<22} {secs:>7.1f}s  {script}")
-    print(f"\nLog: {log_path}")
-    return 0 if all(s[2] in ("OK",) or s[2].startswith("SKIPPED") for s in summary) else 1
-
+    print(f"\nLog:    {log_path}\nReport: {report_path}")
+    return 0 if n_bad == 0 else 1
 
 if __name__ == "__main__":
     raise SystemExit(main())

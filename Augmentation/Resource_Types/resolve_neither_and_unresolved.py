@@ -193,6 +193,8 @@ def resolve_record_type(row):
 
         # Curated OGC types where MSP defaulted generically to 'Dataset'
         if msp_t == "Dataset":
+            if not ogc_t:  # OGC has no type: keep MSP's
+                return msp_t, "msp_fallback_no_ogc_type"
             return ogc_t, "curated_ogc_over_generic_dataset"
 
         # Default to curated OGC type if specific
@@ -201,7 +203,7 @@ def resolve_record_type(row):
 
         return msp_t if msp_t else "Other", "msp_fallback"
 
-    return curr_correct if curr_correct else ogc_t, "default_fallback"
+    return curr_correct if curr_correct else (ogc_t or msp_t), "default_fallback"
 
 
 def create_backup_table(cur, schema):
@@ -254,7 +256,7 @@ def debug_single_identifier(target_ident, csv_path=None, dbname=None, schema="va
     df = pd.read_csv(csv_path, skipinitialspace=True)
     df.columns = df.columns.str.strip()
     for col in df.columns:
-        df[col] = df[col].astype(str).str.strip()
+        df[col] = df[col].astype(str).str.strip().replace({"nan": "", "NaN": "", "None": ""})  # blanks stay blank, never the text "nan"
 
     # Exact or substring match
     match = df[df["identifier"] == target_ident]
@@ -352,7 +354,7 @@ def main():
     df = pd.read_csv(args.input_csv, skipinitialspace=True)
     df.columns = df.columns.str.strip()
     for col in df.columns:
-        df[col] = df[col].astype(str).str.strip()
+        df[col] = df[col].astype(str).str.strip().replace({"nan": "", "NaN": "", "None": ""})  # blanks stay blank, never the text "nan"
     print(f"• Total rows in input CSV: {len(df):,}")
 
     resolutions = df.apply(resolve_record_type, axis=1)
@@ -426,6 +428,8 @@ def main():
         for _, row in df.iterrows():
             ident = str(row["identifier"]).strip()
             target_type = row["final_resolved_type"]
+            if not target_type or target_type.lower() == "nan":  # never write an empty type
+                continue
             if ident in db_records:
                 curr_type = db_records[ident]
                 if curr_type != target_type:

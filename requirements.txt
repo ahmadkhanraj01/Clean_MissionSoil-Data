@@ -10,4 +10,6 @@ tqdm>=4.66.0
 playwright>=1.40.0     # EU-FarmBook harvesters; then run: playwright install chromium
 rdflib>=7.0            # Augmentation/SoilVoc (reads SoilVoc.ttl)
 ftfy>=6.0              # Augmentation/Backfill/cleanup (mojibake repair)
+geopandas>=1.0         # Augmentation/Crossborder (country polygons)
+shapely>=2.0           # Augmentation/Crossborder
 # pg_dump (PostgreSQL client) is also required by Migration/migrate_validate_to_metadata.py

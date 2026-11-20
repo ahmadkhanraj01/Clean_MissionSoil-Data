@@ -139,10 +139,14 @@ def url_from_raw(raw) -> Optional[Result]:
     raw = _as_dict(raw)
     if not raw:
         return None
-    lp = _as_dict(((raw.get("distribution") or {}).get("landingPage"))) or {}
-    u = (lp.get("url") or "").strip()
-    if URL_RE.match(u):
-        return Result("landing_page", normalise_url(u))
+    # "distribution" is a dict in MCF records, but some records hold a list of such dicts
+    dist = raw.get("distribution")
+    for d in (dist if isinstance(dist, list) else [dist]):
+        d = _as_dict(d) or {}
+        lp = _as_dict(d.get("landingPage")) or {}
+        u = (lp.get("url") or "").strip()
+        if URL_RE.match(u):
+            return Result("landing_page", normalise_url(u))
     links = raw.get("links")
     if "bonares" in (raw.get("sources") or []) and isinstance(links, list) and links:
         first = _as_dict(links[0]) or {}

@@ -24,7 +24,7 @@ On `msp-kh-stage` the schema is managed by Alembic (`validate.alembic_version`) 
 
 ---
 
-## `migrate_validate_to_metadata.py` (pipeline step 40)
+## `migrate_validate_to_metadata.py` (pipeline step 41)
 
 **Purpose:** publishes `validate` as `metadata`.
 1. `pg_dump --schema-only --schema=validate` (excluding `validate.records_backup_*`) gives the DDL. The script rewrites `validate` → `metadata` in it.
@@ -54,4 +54,4 @@ python Migration/migrate_validate_to_metadata.py
 ```
 It requires `pg_dump` on the PATH.
 
-> ⚠ **Do not run on `msp-kh-stage` as it is.** The DDL recreates all validate tables, but only the 16 listed above get their data back. On stage, `metadata` also holds `record_soilvoc` (18,587 rows), `record_landcover` (14,842), `record_landuse` (14,419), `soilvoc` (543), `landcover_types` (99) and `landuse_types` (52). Those would end up empty or reduced to whatever `validate` has. `metadata.recommendation_events` (3,051 rows) would be replaced by validate's 1,004. `validate.soilvoc` (1,464) and `validate.record_soilvoc` (18,601), written by `Augmentation/SoilVoc` (steps 24–28), are not copied either. Add the missing tables to the tier lists (`soilvoc`, `landcover_types`, `landuse_types` with the parents; `record_soilvoc`, `record_landcover`, `record_landuse` with the children), and decide what should happen to `recommendation_events`, before running it.
+> ⚠ **Do not run on `msp-kh-stage` as it is.** The DDL recreates all validate tables, but only the 16 listed above get their data back. On stage, `metadata` also holds `record_soilvoc` (18,587 rows), `record_landcover` (14,842), `record_landuse` (14,419), `soilvoc` (543), `landcover_types` (99), `landuse_types` (52) and `record_crossborder` (4,010, checked 2026-11-20). Those would end up empty or reduced to whatever `validate` has. `metadata.recommendation_events` (3,051 rows) would be replaced by validate's 1,004. `validate.soilvoc` (1,464) and `validate.record_soilvoc` (18,601), written by `Augmentation/SoilVoc` (steps 24–28), are not copied either. Add the missing tables to the tier lists (`soilvoc`, `landcover_types`, `landuse_types` with the parents; `record_soilvoc`, `record_crossborder`, `record_landcover`, `record_landuse` with the children), and decide what should happen to `recommendation_events`, before running it.

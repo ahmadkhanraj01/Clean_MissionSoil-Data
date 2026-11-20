@@ -12,7 +12,7 @@ data/OGC_records.json (notebook 01) ──────────────�
                                                         ▼
                              (17) compare_msp_vs_ogc_types ──► data/msp_type_mismatches.csv
                                                         │
-                       notebook 05 (Crossref/DataCite check)
+             (42) resolve_types_from_doi_registries  (= notebook 05: Crossref/DataCite check)
                                                         ▼
                             data/msp_type_mismatches_with_correct_type.csv
                                 │                                    │
@@ -22,6 +22,21 @@ data/OGC_records.json (notebook 01) ──────────────�
 ```
 
 Steps 18 and 19 are **dry run by default** (`--execute` to apply) and create a backup table first.
+
+---
+
+## `resolve_types_from_doi_registries.py` (step 42, runs between 17 and 18)
+
+**Purpose:** script version of notebook 05 (`notebooks/05_doi_registry_type_resolution.ipynb`, outputs cleared). For each mismatch row it extracts the DOI, asks Crossref and then DataCite for the registered type, maps it to a common class, and sets `correct_side`: `msp` / `ogc` (one side matches the registry; both match → `msp`), `neither` (registry answered, no side matches), `unresolved` (no DOI or no answer).
+
+| Direction | Source / target | Details |
+|---|---|---|
+| Input | `data/msp_type_mismatches.csv` (`--infile`) | from step 17 |
+| Input | `api.crossref.org`, `api.datacite.org` | 4 threads, retries on 429/503/504 |
+| Cache | `data/registry_cache.json` | reruns only look up new or failed DOIs |
+| Output | `data/msp_type_mismatches_with_correct_type.csv` | read by steps 18 and 19 |
+
+No database access. Writes only local files, so the dry run is the real run. Flags: `--email` (or `CROSSREF_EMAIL`, for the Crossref polite pool), `--workers`, `--limit`. The number 42 only reflects when it was added; the runner puts it between 17 and 18.
 
 ---
 
@@ -85,7 +100,7 @@ python Augmentation/Resource_Types/compare_msp_vs_ogc_types.py
 
 | Direction | Table / file | Operation | Details |
 |---|---|---|---|
-| Input | `data/msp_type_mismatches_with_correct_type.csv` (`--csv`) | read file | produced by notebook 05 |
+| Input | `data/msp_type_mismatches_with_correct_type.csv` (`--csv`) | read file | produced by step 42 (notebook 05) |
 | Input | `<schema>.records` | SELECT | existence check, counts, type distribution |
 | Backup | `<schema>.records_backup_<ts>` | CREATE TABLE AS SELECT * | with `--execute`, unless `--no-backup` |
 | Output | `<schema>.records` | UPDATE | `SET resource_type, updated_at WHERE identifier = …` |

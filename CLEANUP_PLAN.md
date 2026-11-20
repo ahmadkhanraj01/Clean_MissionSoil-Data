@@ -63,9 +63,10 @@ The data passes through three database layers in PostgreSQL (`msp-kh-dev`):
 | 15 | resource-type scripts (see §3.2) | `validate.records`, OGC JSON, Crossref/DataCite | `validate.records.resource_type` | 10 |
 | 16 | SoilVoc tasks 04 → 06 → 07 (`Augmentation/SoilVoc`, see §3.2) | `SoilVoc.ttl`, `validate.subjects`, `record_subject`, curation CSVs | `validate.soilvoc`, `validate.record_soilvoc`, `validate.subjects.vocabulary_name` | 12–14 |
 | 17 | Backfill (`Augmentation/Backfill`, see §3.2): text cleanup, abstracts ← title, `records.url`, distributions | `validate.records`, `validate.distributions`, OpenAIRE API | `validate.records` (`title`, `abstract`, `raw_metadata`, `url`), `validate.distributions` | 12–14 |
-| 18 | `migrate_validate_to_metadata.py` | `validate.*` | `metadata.*` | 12–17 |
+| 18 | Crossborder `compute_crossborder.py` (`Augmentation/Crossborder`, see §10) | `validate.records.spatial`, country GeoJSON | `validate.record_crossborder` | 12–14 |
+| 19 | `migrate_validate_to_metadata.py` | `validate.*` | `metadata.*` | 12–18 |
 
-`Pipeline/run_pipeline.py` numbers the steps one script at a time: 1–14 as above, resource types 15–19, SoilVoc 20–29, backfill 30–39, migration 40.
+`Pipeline/run_pipeline.py` numbers the steps one script at a time: 1–14 as above, resource types 15–19, SoilVoc 20–29, backfill 30–39, crossborder 40, migration 41.
 
 ---
 
@@ -96,10 +97,12 @@ Clean_MissionSoil-Data/
 │   ├── Resource_Types/               resource_type fixes from OGC + DOI registries (15–19)
 │   ├── Backfill/                     text cleanup, abstracts ← title, records.url, distributions (30–39),
 │   │                                 from SoilWise_metadata_backfill (without crosscheck/)
+│   ├── Crossborder/                  records.spatial bbox → countries → validate.record_crossborder (40),
+│   │                                 from K2X/polygons
 │   └── SoilVoc/                      SoilVoc → validate.soilvoc / record_soilvoc / noise marks (20–29),
 │                                     copied from soil-vocabs/tasks (tasks 01–07, curation/, vocab/)
 ├── Harmonize/                        harvest → validate (9–11)
-├── Migration/                        validate_schema.sql (0), validate → metadata (40)
+├── Migration/                        validate_schema.sql (0), validate → metadata (41)
 ├── Pipeline/                         run_pipeline.py, verify_readonly.py, logs/
 ├── _archive/                         legacy/one-off scripts, reference only
 └── data/                             local input/output files (git-ignored)
@@ -165,6 +168,10 @@ Clean_MissionSoil-Data/
 │   │   ├── diagnostics/               7 read-only inspectors
 │   │   ├── docs/                      original reports and plans
 │   │   └── output/                    generated files + undo material (git-ignored)
+│   ├── Crossborder/                   copied from K2X/polygons (2026-11-20)
+│   │   ├── compute_crossborder.py     bbox → countries covered → validate.record_crossborder (step 40, --dry-run)
+│   │   ├── PLAN_crossborder_spatial.md  the original design, counting rule, results and checks
+│   │   └── data/                      countries_europe45.geojson, regions/NOR.geojson (GISCO file optional, git-ignored)
 │   └── SoilVoc/                       copied from soil-vocabs/tasks; README has every script's tables and files
 │       ├── paths.py                   all paths (repo root, vocab/, curation/, task outputs); applies MSP_READ_ONLY
 │       ├── vocab/                     SoilVoc.ttl, SoilVoc_concepts.csv, ontovocabs/, uk2us.py (from soil-vocabs root)
@@ -185,10 +192,10 @@ Clean_MissionSoil-Data/
 │
 ├── Migration/                         validate → metadata, plus schema DDL
 │   ├── validate_schema.sql            DDL for the validate schema: 20 tables, FKs, indexes (step 0, run once)
-│   └── migrate_validate_to_metadata.py  pg_dump DDL + copy validate.* → metadata.* with counts/orphan check (step 40)
+│   └── migrate_validate_to_metadata.py  pg_dump DDL + copy validate.* → metadata.* with counts/orphan check (step 41)
 │
 ├── Pipeline/                          runs and checks everything else; holds no pipeline logic itself
-│   ├── run_pipeline.py                orchestrates the 30 steps in order: list / --stage / --only / --live (confirm), logs
+│   ├── run_pipeline.py                orchestrates the 42 steps in order: list / --stage / --only / --live (confirm), logs
 │   ├── verify_readonly.py             scans scripts vs DB tables/columns, forces MSP_READ_ONLY=1, exit 1 on problems
 │   └── logs/                          one timestamped log file per run
 │
@@ -497,3 +504,23 @@ Copied from `SoilWise_metadata_backfill` (commit `450a342`) into `Augmentation/B
 - Verified read-only on stage (all 27 scripts compile; every DB script ran): scan 348 records / 353 field changes; `verify_diff` says NEEDS REVIEW (2 rows may lose words), so the apply is correctly blocked. 1 placeholder abstract. 0 new URLs from the identifier rules and 6 from the verified OpenAIRE/page candidates (1,991 still without). 204 URLs without a distribution row.
 - Open: `build_url_column.py --apply` runs `ALTER TABLE`, which needs the owner of `validate.records` (`missionsoil_user`), not the `.env` user.
 
+## 10. Update (2026-11-20): Crossborder (`K2X/polygons`)
+
+Copied from `K2X/polygons` into `Augmentation/Crossborder/`; the original folder was only read. Pipeline step 40 (stage `spatial`); migration moved to step 41.
+
+| Item | From `polygons/` | Action |
+|---|---|---|
+| `compute_crossborder.py` | root | Copy. DB settings from the repo `.env` via `common/db.py` (honours `MSP_READ_ONLY=1`) instead of `polygons/.env`; data paths → `./data`; the GISCO file is read only by the scopes that use it |
+| `PLAN_crossborder_spatial.md` | root | Copy unchanged |
+| `data/countries_europe45.geojson` | `data/` (= `geojson_data 1/geojson_data/countries.geojson`) | Copy |
+| `data/regions/NOR.geojson` | `geojson_data 1/geojson_data/regions/` | Copy. The only regions file that patches a country; the other 35 change nothing |
+| `CNTR_RG_01M_2020_4326.geojson` (62 MB) | `data/` | **Not copied** (git-ignored if added). Only the `hybrid`/`world`/`europe`/`eu27` scopes need it |
+| `.env`, `.env.template` | root | Not copied: the repo `.env` is used |
+
+- Verified read-only on stage: the copy's `--dry-run --csv` output is **byte-identical** to the original's (4,857 records with `spatial`, 4,010 rows, 1,558 cross-border).
+- Stage already holds the table: `validate.record_crossborder` and `metadata.record_crossborder` (4,010 rows each). `msp-kh-dev` has neither, so a live run there would create it.
+- The migration (step 41) does not copy `record_crossborder`, so it would empty `metadata.record_crossborder`. See the migration warning.
+
+## 11. Update (2026-11-20): notebook 05 as step 42
+
+`MissionSoil-Data/notebooks/05_doi_registry_type_resolution.ipynb` is now `Augmentation/Resource_Types/resolve_types_from_doi_registries.py` (step 42, listed between 17 and 18 in the runner) plus the notebook in `Resource_Types/notebooks/` (outputs cleared, the author's e-mail replaced by a placeholder; the script takes `--email` / `CROSSREF_EMAIL`). It produces `msp_type_mismatches_with_correct_type.csv`, the input of steps 18 and 19, so those no longer depend on a manual notebook run. `resolve_neither_and_unresolved.py` was already step 19. The notebook's CLI cell has a broken regex quote; the script uses the working regex of the batch cell.

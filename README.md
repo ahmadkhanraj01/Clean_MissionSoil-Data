@@ -6,7 +6,7 @@ The cleaned MissionSoil data pipeline. It harvests soil-knowledge records into P
 external sources ──► harvest.* (raw payloads) ──► validate.* (relational, cleaned, linked) ──► metadata.* (published)
 ```
 
-**📊 Pipeline data-flow diagram (DFD): [open the interactive page](https://claude.ai/artifact/Mjc7awFNtsZ8fHSTqD4MUH)**: all 40 steps, with the tables and files each script reads and writes, and a zoomable overview. The same page is in this repo as [`pipeline_dfd.html`](pipeline_dfd.html); download it and open it in a browser.
+**📊 Pipeline data-flow diagram (DFD): [open the interactive page](https://claude.ai/artifact/Mjc7awFNtsZ8fHSTqD4MUH)**: all 42 steps, with the tables and files each script reads and writes, and a zoomable overview. The same page is in this repo as [`pipeline_dfd.html`](pipeline_dfd.html); download it and open it in a browser.
 
 It combines three sources:
 
@@ -34,7 +34,7 @@ playwright install chromium        # only for the EU-FarmBook harvesters
 cp .env.template .env              # then fill in the DB settings
 ```
 
-`requirements.txt` also lists `rdflib` (SoilVoc) and `ftfy` (Backfill text cleanup). `pg_dump` must be on the PATH for the migration.
+`requirements.txt` also lists `rdflib` (SoilVoc) and `ftfy` (Backfill text cleanup), and `geopandas` + `shapely` (Crossborder). `pg_dump` must be on the PATH for the migration.
 
 **`.env`:** use the suffixed names from `.env.template`:
 - `DB_HOST1 … DB_SCHEMA1` is the working database (stage, schema `validate`).
@@ -45,7 +45,7 @@ cp .env.template .env              # then fill in the DB settings
 ## Run
 
 ```bash
-python Pipeline/run_pipeline.py                            # list the 40 steps and their dry-run flags
+python Pipeline/run_pipeline.py                            # list the 42 steps and their dry-run flags
 python Pipeline/run_pipeline.py --run                      # dry run of every step that has one
 python Pipeline/run_pipeline.py --run --stage backfill     # dry run of one stage
 python Pipeline/run_pipeline.py --run --live --only 35     # real run of one step (asks you to type the DB name)
@@ -65,11 +65,12 @@ Each run writes a log to `Pipeline/logs/`. `--keep-going` continues after a fail
 | types | 15–19 | `Augmentation/Resource_Types` | OGC API + DOI registries → `validate.records.resource_type` |
 | soilvoc | 20–29 | `Augmentation/SoilVoc` | SoilVoc.ttl + subjects → `validate.soilvoc`, `validate.record_soilvoc`, noise marks |
 | backfill | 30–39 | `Augmentation/Backfill` | text cleanup, abstracts ← title, `records.url`, `distributions` |
-| migrate | 40 | `Migration/` | `validate.*` → `metadata.*` |
+| spatial | 40 | `Augmentation/Crossborder` | `records.spatial` bounding box → countries covered → `validate.record_crossborder` |
+| migrate | 41 | `Migration/` | `validate.*` → `metadata.*` |
 
 ### What a dry run does
 
-- **Skipped (no dry run):** steps 1, 2, 4, 5, 6, 15, 24, 25, 28 and 40. Run them on purpose with `--live --only N`.
+- **Skipped (no dry run):** steps 1, 2, 4, 5, 6, 15, 24, 25, 28 and 41. Step 42 (DOI-registry types) runs between 17 and 18. Run them on purpose with `--live --only N`.
 - **Write, then roll back:** most other steps. They stop at the first write when `MSP_READ_ONLY=1` is set.
 - **Read only, write files:** SoilVoc 20–23, 26, 27, 29 and Backfill 30–34, 36, 39.
 - **Manual on purpose, not in the runner:**
@@ -93,6 +94,7 @@ Each run writes a log to `Pipeline/logs/`. `--keep-going` continues after a fail
 | `Augmentation/Resource_Types/` | `validate.records.resource_type` from the OGC API and DOI registries |
 | `Augmentation/SoilVoc/` | SoilVoc → `validate.soilvoc`, `validate.record_soilvoc`, noise subjects; plus analyses (tasks 01, 03, 05), `curation/`, `vocab/` |
 | `Augmentation/Backfill/` | messy-text cleanup, empty abstracts ← title, `records.url`, missing `distributions`, URL checks, diagnostics |
+| `Augmentation/Crossborder/` | how many of 45 European countries each `records.spatial` box covers → `validate.record_crossborder` |
 | `Migration/` | `validate_schema.sql`, `validate.*` → `metadata.*` |
 | `Pipeline/` | `run_pipeline.py`, `verify_readonly.py`, `logs/` |
 | `_archive/` | one-off and legacy scripts, kept for reference only (they will not run as-is) |
@@ -102,7 +104,7 @@ Each run writes a log to `Pipeline/logs/`. `--keep-going` continues after a fail
 
 | # | Issue | Where |
 |---|---|---|
-| 1 | **Do not run the migration (step 40) on stage as it is.** It drops `metadata` and copies only 16 tables. `soilvoc`, `record_soilvoc`, `record_landcover`, `record_landuse` and the type tables would be lost, and `recommendation_events` would shrink from 3,051 to 1,004 rows | `Migration/migrate_validate_to_metadata.py` |
+| 1 | **Do not run the migration (step 41) on stage as it is.** It drops `metadata` and copies only 16 tables. `soilvoc`, `record_soilvoc`, `record_crossborder`, `record_landcover`, `record_landuse` and the type tables would be lost, and `recommendation_events` would shrink from 3,051 to 1,004 rows | `Migration/migrate_validate_to_metadata.py` |
 | 2 | The Solr harvester inserts `harvest.items.updated_date`, which does not exist on stage | `Harvesting/Solar_API/harvest_solr_records.py` |
 | 3 | The CORDIS harvester needs `harvest.sources`, which does not exist on stage | `Harvesting/CORDIS/` |
 | 4 | The subject cleaner turns `'4 per 1000" initiative'` into `'per 1000" initiative'` | `Augmentation/Cleanning-Scripts/clean_stage_subjects.py` |

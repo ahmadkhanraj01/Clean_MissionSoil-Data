@@ -279,6 +279,11 @@ flowchart LR
   diff[/"messy_cleanup_before_after.csv"/]
   cur[/"curation/*.csv"/]
 
+  subgraph XB["7 · Crossborder"]
+    xb1(["compute_crossborder"])
+  end
+  geo[/"countries_europe45.geojson + regions/NOR"/]
+
   s15(["migrate_validate_to_metadata"])
   meta[("metadata.*")]
 
@@ -329,6 +334,8 @@ flowchart LR
   oa --> bf3
   val --> bf3 --> val
   val --> bf4 --> val
+  geo --> xb1
+  val --> xb1 --> val
   val --> s15 --> meta
 </pre>
 <script type="module">
@@ -502,7 +509,7 @@ draw();
     </div>
   </section>
 
-  <footer>Built from the scripts on branch <code>mahnoor</code> (commit c9ed49c), <code>soil-vocabs/tasks</code> (steps 20–29) and <code>SoilWise_metadata_backfill</code> (steps 30–39). Folders follow CLEANUP_PLAN.md. Step numbers match <code>Pipeline/run_pipeline.py</code>.</footer>
+  <footer>Built from the scripts on branch <code>mahnoor</code> (commit c9ed49c), <code>soil-vocabs/tasks</code> (steps 20–29) and <code>SoilWise_metadata_backfill</code> (steps 30–39) and <code>K2X/polygons</code> (step 40). Folders follow CLEANUP_PLAN.md. Step numbers match <code>Pipeline/run_pipeline.py</code>.</footer>
 </div>
 
 <script>
@@ -521,6 +528,7 @@ const STAGES = [
   { id: "types", name: "Resource types", hint: "fix validate.records.resource_type" },
   { id: "soilvoc", name: "SoilVoc", hint: "SoilVoc concepts and record links in validate.* (Augmentation/SoilVoc)" },
   { id: "backfill", name: "Backfill", hint: "text cleanup, abstracts, records.url, distributions (Augmentation/Backfill)" },
+  { id: "spatial", name: "Crossborder", hint: "records.spatial bbox → countries covered (Augmentation/Crossborder)" },
   { id: "migrate", name: "Migration", hint: "validate.* → metadata.*" },
 ];
 
@@ -729,10 +737,15 @@ const STEPS = [
     does: "Compares records.url with the decoded distributions.access_url per record and writes a report.",
     reads: [V("validate.records"), V("validate.distributions")], writes: [F("output/url/url_vs_dist_per_record.csv"), F("docs/url/url_vs_accessurl_report.md")], flags: ["SELECT only", "--http"] },
 
-  { n: 40, stage: "migrate", script: "migrate_validate_to_metadata.py", folder: "Migration/",
+  { n: 40, stage: "spatial", script: "compute_crossborder.py", folder: "Augmentation/Crossborder/",
+    does: "Parses each records.spatial WKT bounding box and works out which of the 45 European countries it covers (national-bbox match, else share ≥ 10% or inside ≥ 80%). One row per record; cross-border when more than one country. Records touching none of the 45 get no row.",
+    reads: [V("validate.records"), F("data/countries_europe45.geojson"), F("data/regions/NOR.geojson")], writes: [V("validate.record_crossborder")],
+    flags: ["--dry-run", "one transaction", "replaces older runs"] },
+
+  { n: 41, stage: "migrate", script: "migrate_validate_to_metadata.py", folder: "Migration/",
     does: "Drops and rebuilds metadata from the validate DDL, then copies 16 validate tables into metadata in dependency order and checks row counts and orphans. validate is only read.",
     reads: [V("validate.* (all tables)")], writes: [M("metadata.* (same tables)")], flags: ["skips records_backup_*"],
-    warn: "Copies only 16 tables: soilvoc, record_soilvoc, record_landcover, record_landuse and the type tables would end up empty in metadata. Do not run on stage as it is." },
+    warn: "Copies only 16 tables: soilvoc, record_soilvoc, record_crossborder, record_landcover, record_landuse and the type tables would end up empty in metadata. Do not run on stage as it is." },
 ];
 
 const TAG = { ext: "src", harvest: "", validate: "", metadata: "", file: "file" };

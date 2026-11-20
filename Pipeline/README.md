@@ -6,12 +6,12 @@ Tools to run and check the whole pipeline. Neither tool contains pipeline logic 
 
 ## `run_pipeline.py`
 
-**Purpose:** runs the 40 pipeline steps in order (see `../pipeline_dfd.html`), each as its own subprocess.
+**Purpose:** runs the 42 pipeline steps in order (see `../pipeline_dfd.html`), each as its own subprocess.
 
 | Mode | Command | What happens |
 |---|---|---|
 | List | `python Pipeline/run_pipeline.py` | prints the steps and each one's dry-run flag; runs nothing |
-| Dry run | `python Pipeline/run_pipeline.py --run` | runs every step with its dry-run flag. Steps **without** a dry run (1, 2, 4, 5, 6, 15, 24, 25, 28, 40) are skipped and reported as skipped |
+| Dry run | `python Pipeline/run_pipeline.py --run` | runs every step with its dry-run flag. Steps **without** a dry run (1, 2, 4, 5, 6, 15, 24, 25, 28, 41) are skipped and reported as skipped |
 | One stage / step | `--stage clean` · `--stage soilvoc` · `--only 12 13` | filter |
 | Live | `--run --live` | real run; you must type the database name to confirm |
 | Keep going | `--keep-going` | do not stop at the first failed step |
@@ -32,10 +32,11 @@ Backfill: steps 35, 37 and 38 get `--apply` in a live run, and their dry run onl
 | augment | 8 |
 | harmonize | 9–11 |
 | clean | 12–14 |
-| types | 15–19 |
+| types | 15–19 and 42 (42 runs between 17 and 18) |
 | soilvoc | 20–29 |
 | backfill | 30–39 |
-| migrate | 40 |
+| spatial | 40 |
+| migrate | 41 |
 
 > Most `--dry-run` modes write inside a transaction and roll back. To check without any write at all, use `MSP_READ_ONLY=1` (below): such steps then stop at their first INSERT.
 
