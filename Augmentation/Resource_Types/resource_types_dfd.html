@@ -1,0 +1,658 @@
+<title>Resource Type Resolution Data Flow — Clean_MissionSoil-Data</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a single reading column. Overview DFD first, then one mini-DFD row per step (inputs -> script -> outputs), then a table index. */
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --fg: #1d2420;
+  --muted: #5d6862;
+  --line: #d9dfdb;
+  --accent: #2f6b4f;
+  --ext: #55606b;      --ext-bg: #eef0f3;
+  --harvest: #9a5b12;  --harvest-bg: #fbf1e3;
+  --validate: #0e6e74; --validate-bg: #e3f3f3;
+  --metadata: #4b4fa8; --metadata-bg: #ececfa;
+  --file: #6a6a3a;     --file-bg: #f3f3e6;
+  --dim: 0.28;
+  --font-display: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --surface: #1c2320; --fg: #e4ebe7; --muted: #9aa7a0; --line: #2f3a35; --accent: #7cc5a0;
+    --ext: #b5bfca; --ext-bg: #262c33;
+    --harvest: #f0b866; --harvest-bg: #34281a;
+    --validate: #6fd3d8; --validate-bg: #15302f;
+    --metadata: #a9adf5; --metadata-bg: #24264a;
+    --file: #cfcf8f; --file-bg: #2c2c1d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1c2320; --fg: #e4ebe7; --muted: #9aa7a0; --line: #2f3a35; --accent: #7cc5a0;
+  --ext: #b5bfca; --ext-bg: #262c33;
+  --harvest: #f0b866; --harvest-bg: #34281a;
+  --validate: #6fd3d8; --validate-bg: #15302f;
+  --metadata: #a9adf5; --metadata-bg: #24264a;
+  --file: #cfcf8f; --file-bg: #2c2c1d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+}
+.wrap {
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 64px;
+  display: flex; flex-direction: column; gap: 44px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(28px, 4.4vw, 40px); line-height: 1.1; }
+h2 { font-size: 22px; }
+h3 { font-size: 15px; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0; word-break: break-word; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.92em; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+header { display: flex; flex-direction: column; gap: 12px; }
+header p { color: var(--muted); }
+.layers { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--font-mono); font-size: 13px; margin-top: 6px; }
+.layers .arrow { color: var(--muted); }
+
+section { display: flex; flex-direction: column; gap: 16px; }
+.section-head { display: flex; flex-direction: column; gap: 6px; }
+.section-head p { color: var(--muted); }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 13px; color: var(--muted); align-items: center; }
+.legend > span { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Chips: DFD notation */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.3;
+  padding: 4px 9px; border: 1px solid transparent; color: var(--fg);
+  max-width: 100%; word-break: break-word; text-align: left;
+  background: none; cursor: default;
+}
+button.chip { cursor: pointer; }
+button.chip:hover { filter: brightness(0.97); outline: 1px solid currentColor; outline-offset: 1px; }
+button.chip:focus-visible, .filters button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* external entity: solid box */
+.k-ext { background: var(--ext-bg); border-color: var(--ext); color: var(--fg); border-radius: 2px; }
+/* data store: open-ended box (top, bottom, left bar) */
+.k-harvest, .k-validate, .k-metadata {
+  border-top-color: currentColor; border-bottom-color: currentColor; border-left: 4px solid currentColor; border-right: none; border-radius: 0;
+}
+.k-harvest { background: var(--harvest-bg); color: var(--harvest); }
+.k-validate { background: var(--validate-bg); color: var(--validate); }
+.k-metadata { background: var(--metadata-bg); color: var(--metadata); }
+.k-harvest span, .k-validate span, .k-metadata span { color: var(--fg); }
+/* file on disk: dashed */
+.k-file { background: var(--file-bg); border: 1px dashed var(--file); color: var(--fg); border-radius: 2px; }
+.chip .tag { font-size: 10.5px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-body); font-weight: 600; }
+.proc-swatch { display: inline-block; width: 22px; height: 14px; border-radius: 8px; border: 2px solid var(--accent); background: var(--surface); }
+
+/* Overview diagram */
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+.dfd-src { display: none; }
+.dfd-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.dfd-toolbar button {
+  font: 500 13px var(--font-body); min-width: 34px; height: 32px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer;
+}
+.dfd-toolbar button:hover { border-color: var(--accent); }
+.dfd-toolbar button:focus-visible, .dfd-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dfd-toolbar .zoom-level { font: 12px var(--font-mono); color: var(--muted); min-width: 44px; text-align: center; }
+.dfd-toolbar .hint { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+.dfd-view { position: relative; height: clamp(360px, 64vh, 760px); cursor: grab; touch-action: pan-y; user-select: none; }
+.dfd-view.dragging { cursor: grabbing; }
+.dfd-view svg { display: block; width: 100%; height: 100%; max-width: none !important; }
+.dfd-status { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; padding: 16px; text-align: center; }
+.dfd-status[hidden] { display: none; }
+/* full-screen overlay (works inside the artifact frame, where the Fullscreen API may be blocked) */
+.diagram.maxed { position: fixed; inset: 0; z-index: 50; border-radius: 0; border: 0; }
+.diagram.maxed .dfd-view { height: auto; flex: 1; touch-action: none; }
+body.dfd-lock { overflow: hidden; }
+@media (max-width: 760px) {
+  .dfd-toolbar .hint { margin-left: 0; width: 100%; }
+  .dfd-view { height: clamp(260px, 48vh, 420px); }
+}
+
+/* Filters */
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filters button {
+  font: 500 13px var(--font-body); padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer;
+}
+.filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.filter-note { font-size: 13px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.filter-note button { font: 500 13px var(--font-body); background: none; border: none; color: var(--accent); cursor: pointer; text-decoration: underline; padding: 0; }
+
+/* Stage groups and steps */
+.stage { display: flex; flex-direction: column; gap: 10px; }
+.stage-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.stage-title h2 { font-size: 19px; }
+.stage-title span { color: var(--muted); font-size: 13px; }
+.step {
+  display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1.15fr) 28px minmax(0, 1fr);
+  align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px;
+  transition: opacity 0.15s ease;
+}
+.step.dim { opacity: var(--dim); }
+.io { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
+.io .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.flow { color: var(--muted); font-size: 18px; text-align: center; user-select: none; }
+.proc {
+  border: 2px solid var(--accent); border-radius: 14px; padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.proc-top { display: flex; gap: 10px; align-items: baseline; }
+.num { font-family: var(--font-display); font-weight: 700; color: var(--accent); font-size: 15px; font-variant-numeric: tabular-nums; flex: none; }
+.folder { font-family: var(--font-mono); font-size: 12px; color: var(--muted); word-break: break-word; }
+.proc p { font-size: 13.5px; color: var(--fg); }
+.flags { display: flex; flex-wrap: wrap; gap: 4px; }
+.flags code { font-size: 11.5px; color: var(--muted); border: 1px solid var(--line); padding: 1px 6px; border-radius: 3px; }
+.warn { font-size: 12.5px; color: var(--harvest); }
+
+/* Table index */
+.tbl-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+td .refs { display: flex; flex-wrap: wrap; gap: 4px 10px; font-family: var(--font-mono); font-size: 12.5px; }
+td .refs span { white-space: nowrap; }
+td .refs b { color: var(--accent); font-weight: 500; }
+footer { color: var(--muted); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .step { grid-template-columns: minmax(0, 1fr); }
+  .flow { transform: rotate(90deg); line-height: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .step { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Clean_MissionSoil-Data · Augmentation/Resource_Types</div>
+    <h1>Resource Type Resolution Data Flow</h1>
+    <p>How <code>validate.records.resource_type</code> gets corrected. Six scripts compare the MSP database against the SoilWise OGC catalogue, let the DOI registries break the tie, then write the answer back. Steps 15&ndash;17 and 42 touch only files in <code>data/</code>; only steps 18 and 19 write to the database.</p>
+    <div class="layers">
+      <span class="chip k-file"><span>msp-kh-dev.json</span></span><span class="arrow">&rarr;</span>
+      <span class="chip k-file"><span>msp_type_mismatches.csv</span></span><span class="arrow">&rarr;</span>
+      <span class="chip k-file"><span>..._with_correct_type.csv</span></span><span class="arrow">&rarr;</span>
+      <span class="chip k-validate"><span>validate.records</span></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>Overview</h2>
+      <p>The whole resource-type flow. Steps 15&ndash;17 build the mismatch list, step 42 asks the DOI registries which side is right, and steps 18&ndash;19 write the decision back. The notebook and the script are two routes through the same step.</p>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <span><span class="chip k-ext">source</span> External source</span>
+      <span><span class="proc-swatch"></span> Process (script)</span>
+      <span><span class="chip k-harvest"><span>table</span></span> Data store (DB table)</span>
+      <span><span class="chip k-file">file</span> File on disk</span>
+    </div>
+    <div class="diagram" id="dfd">
+      <div class="dfd-toolbar" role="toolbar" aria-label="Diagram zoom">
+        <button type="button" id="dfdOut" aria-label="Zoom out">−</button>
+        <span class="zoom-level" id="dfdLevel" aria-live="polite">100%</span>
+        <button type="button" id="dfdIn" aria-label="Zoom in">+</button>
+        <button type="button" id="dfdFit">Fit</button>
+        <button type="button" id="dfdMax" aria-pressed="false">Full screen</button>
+        <span class="hint" id="dfdHint">Drag to move · Ctrl + scroll (or pinch in full screen) to zoom · keys + − 0</span>
+      </div>
+      <div class="dfd-view" id="dfdView" tabindex="0" aria-label="Pipeline overview diagram. Use plus and minus to zoom, arrow keys to move, 0 to fit.">
+        <div class="dfd-status" id="dfdStatus">Drawing the diagram…</div>
+      </div>
+<pre class="dfd-src" id="dfdSource">
+flowchart LR
+  subgraph SRC["External sources"]
+    ogcapi["SoilWise OGC API"]
+    xref["Crossref / DataCite"]
+  end
+
+  subgraph FETCH["1 · Fetch"]
+    s15(["fetch_soilwise_records"])
+    s16(["fetch_msp_kh_records"])
+  end
+
+  val[("validate.records")]
+  percap[/"data/*_records.json"/]
+  ogcrec[/"data/OGC_records.json"/]
+  mspjson[/"data/msp-kh-dev.json"/]
+
+  subgraph CMP["2 · Compare"]
+    s17(["compare_msp_vs_ogc_types"])
+  end
+  mism[/"data/msp_type_mismatches.csv"/]
+
+  subgraph RES["3 · Registry check"]
+    s42(["resolve_types_from_doi_registries"])
+    nb05(["05_doi_registry_type_resolution.ipynb"])
+  end
+  cache[/"data/registry_cache.json"/]
+  correct[/"data/msp_type_mismatches_with_correct_type.csv"/]
+
+  subgraph APP["4 · Apply"]
+    s18(["update_resource_types_from_ogc"])
+    s19(["resolve_neither_and_unresolved"])
+  end
+  bkp[("validate.records_backup_…")]
+  fully[/"data/msp_type_mismatches_fully_resolved.csv"/]
+
+  ogcapi --> s15 --> percap
+  ogcapi -. rebuild .-> ogcrec
+  val --> s16 --> mspjson
+  mspjson --> s17
+  ogcrec --> s17
+  s17 --> mism
+  mism --> s42
+  mism --> nb05
+  xref --> s42
+  xref --> nb05
+  s42 --> cache
+  cache --> s42
+  nb05 --> cache
+  cache --> nb05
+  s42 --> correct
+  nb05 --> correct
+  correct --> s18
+  val --> s18
+  s18 --> val
+  s18 --> bkp
+  correct --> s19
+  val --> s19
+  s19 --> val
+  s19 --> bkp
+  s19 --> fully
+</pre>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+
+const box = document.getElementById("dfd");
+const view = document.getElementById("dfdView");
+const status = document.getElementById("dfdStatus");
+const level = document.getElementById("dfdLevel");
+const src = document.getElementById("dfdSource").textContent;
+let svg = null, base = null, vb = null, fitWidth = 1, renders = 0;
+
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+async function draw() {
+  const v = {
+    fontFamily: css("--font-mono"), fontSize: "12px",
+    background: css("--surface"), primaryColor: css("--surface"), primaryTextColor: css("--fg"),
+    primaryBorderColor: css("--accent"), lineColor: css("--muted"), textColor: css("--fg"),
+    secondaryColor: css("--bg"), tertiaryColor: css("--bg"),
+    clusterBkg: css("--bg"), clusterBorder: css("--line"), edgeLabelBackground: css("--surface"),
+  };
+  mermaid.initialize({ startOnLoad: false, theme: "base", themeVariables: v, securityLevel: "strict",
+                       flowchart: { useMaxWidth: false, htmlLabels: true, curve: "basis" } });
+  try {
+    const { svg: markup } = await mermaid.render("dfdSvg" + (++renders), src);
+    view.querySelectorAll("svg").forEach(s => s.remove());
+    view.insertAdjacentHTML("beforeend", markup);
+    svg = view.querySelector("svg");
+    svg.removeAttribute("width"); svg.removeAttribute("height"); svg.style.maxWidth = "none";
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    const [x, y, w, h] = svg.getAttribute("viewBox").split(/[\s,]+/).map(Number);
+    base = { x, y, w, h };
+    status.hidden = true;
+    fit();
+  } catch (e) {
+    status.hidden = false;
+    status.textContent = "The diagram could not be drawn here. The step list below has the same information.";
+  }
+}
+
+function apply() {
+  if (!svg) return;
+  svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  level.textContent = Math.round((fitWidth / vb.w) * 100) + "%";   // 100% = Fit
+}
+// width of the viewBox when the whole diagram fits the frame
+function fitW() {
+  const r = view.getBoundingClientRect();
+  return Math.max(base.w, base.h * (r.width / Math.max(r.height, 1)));
+}
+function fit() {
+  if (!base) return;
+  const r = view.getBoundingClientRect(), aspect = r.width / Math.max(r.height, 1);
+  let w = base.w, h = base.h;
+  if (w / h > aspect) h = w / aspect; else w = h * aspect;
+  const pad = 0.03;
+  vb = { x: base.x - (w - base.w) / 2 - w * pad, y: base.y - (h - base.h) / 2 - h * pad, w: w * (1 + 2 * pad), h: h * (1 + 2 * pad) };
+  fitWidth = vb.w;
+  apply();
+}
+// client point -> diagram coordinates
+function toSvg(cx, cy) {
+  const r = view.getBoundingClientRect();
+  const s = Math.max(vb.w / r.width, vb.h / r.height);          // diagram units per pixel (meet)
+  const ox = (r.width - vb.w / s) / 2, oy = (r.height - vb.h / s) / 2;
+  return { x: vb.x + (cx - r.left - ox) * s, y: vb.y + (cy - r.top - oy) * s, s };
+}
+function zoom(f, cx, cy) {
+  if (!vb) return;
+  const r = view.getBoundingClientRect();
+  if (cx === undefined) { cx = r.left + r.width / 2; cy = r.top + r.height / 2; }
+  const minW = fitWidth / 8, maxW = fitWidth * 1.5;          // 67% .. 800% of Fit
+  const nw = Math.min(maxW, Math.max(minW, vb.w / f));
+  f = vb.w / nw;
+  const p = toSvg(cx, cy);
+  vb = { x: p.x - (p.x - vb.x) / f, y: p.y - (p.y - vb.y) / f, w: vb.w / f, h: vb.h / f };
+  apply();
+}
+function pan(dxPx, dyPx) {
+  const { s } = toSvg(0, 0);
+  vb.x -= dxPx * s; vb.y -= dyPx * s; apply();
+}
+
+document.getElementById("dfdIn").onclick = () => zoom(1.25);
+document.getElementById("dfdOut").onclick = () => zoom(1 / 1.25);
+document.getElementById("dfdFit").onclick = fit;
+const maxBtn = document.getElementById("dfdMax");
+function setMax(on) {
+  box.classList.toggle("maxed", on);
+  document.body.classList.toggle("dfd-lock", on);
+  maxBtn.setAttribute("aria-pressed", String(on));
+  maxBtn.textContent = on ? "Close full screen" : "Full screen";
+  requestAnimationFrame(fit);
+  if (on) view.focus();
+}
+maxBtn.onclick = () => setMax(!box.classList.contains("maxed"));
+
+view.addEventListener("wheel", (e) => {
+  if (!(e.ctrlKey || e.metaKey || box.classList.contains("maxed"))) return;   // plain scroll keeps scrolling the page
+  e.preventDefault();
+  zoom(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)), e.clientX, e.clientY);
+}, { passive: false });
+
+// drag to pan (mouse/pen always; touch in full screen), two fingers to pinch-zoom (full screen)
+const pts = new Map(); let pinch = null;
+view.addEventListener("pointerdown", (e) => {
+  if (!svg || (e.pointerType === "touch" && !box.classList.contains("maxed"))) return;
+  if (e.button > 0) return;
+  view.setPointerCapture(e.pointerId);
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  view.classList.add("dragging");
+  if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); }
+});
+view.addEventListener("pointermove", (e) => {
+  const prev = pts.get(e.pointerId); if (!prev) return;
+  const cur = { x: e.clientX, y: e.clientY };
+  if (pts.size === 1) pan(cur.x - prev.x, cur.y - prev.y);
+  pts.set(e.pointerId, cur);
+  if (pts.size === 2 && pinch) {
+    const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+    zoom(d / pinch, (a.x + b.x) / 2, (a.y + b.y) / 2); pinch = d;
+  }
+});
+const end = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) view.classList.remove("dragging"); };
+view.addEventListener("pointerup", end); view.addEventListener("pointercancel", end);
+view.addEventListener("dblclick", (e) => zoom(e.shiftKey ? 1 / 1.6 : 1.6, e.clientX, e.clientY));
+
+view.addEventListener("keydown", (e) => {
+  const step = 60, k = e.key;
+  if (k === "+" || k === "=") zoom(1.25);
+  else if (k === "-" || k === "_") zoom(1 / 1.25);
+  else if (k === "0") fit();
+  else if (k === "ArrowLeft") pan(step, 0); else if (k === "ArrowRight") pan(-step, 0);
+  else if (k === "ArrowUp") pan(0, step); else if (k === "ArrowDown") pan(0, -step);
+  else if (k === "Escape" && box.classList.contains("maxed")) setMax(false);
+  else return;
+  e.preventDefault();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && box.classList.contains("maxed")) setMax(false); });
+
+new ResizeObserver(() => { if (vb) apply(); }).observe(view);
+const mq = matchMedia("(prefers-color-scheme: dark)");
+mq.addEventListener?.("change", draw);
+new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+draw();
+</script>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Steps</h2>
+      <p>Read each row left to right: what the script reads, the script itself (with its folder in Clean_MissionSoil-Data), and what it writes. Click any table or file to highlight every step that touches it.</p>
+    </div>
+    <div class="filters" role="group" aria-label="Filter by stage" id="stageFilters"></div>
+    <div class="filter-note" id="filterNote" hidden></div>
+    <div id="steps" style="display:flex;flex-direction:column;gap:28px"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Table index</h2>
+      <p>For each table and file: which steps write it and which steps read it. The numbers match the steps above.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Table / file</th><th>Written by</th><th>Read by</th></tr></thead>
+        <tbody id="index"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Built from <code>Augmentation/Resource_Types/</code> on 2026-11-20. Step numbers match <code>Pipeline/run_pipeline.py</code>, where the DOI resolver is registered as <b>step 42</b> because it must run between 17 and 18. Counts from a real run: 33,566 MSP records · 36,148 OGC features · 1,988 mismatches · 52 of the first 100 rows carried a DOI.</footer>
+</div>
+
+<script>
+const E = (n) => ({ k: "ext", n });
+const H = (n) => ({ k: "harvest", n });
+const V = (n) => ({ k: "validate", n });
+const M = (n) => ({ k: "metadata", n });
+const F = (n) => ({ k: "file", n });
+
+const STAGES = [
+  { id: "fetch", name: "Fetch", hint: "OGC catalogue and the MSP export into data/" },
+  { id: "compare", name: "Compare", hint: "match MSP records to OGC features, list the type mismatches" },
+  { id: "resolve", name: "Registry check", hint: "Crossref / DataCite decide which side is right (step 42)" },
+  { id: "apply", name: "Apply", hint: "write the decision back to validate.records" },
+];
+
+const STEPS = [
+  { n: 15, stage: "fetch", script: "fetch_soilwise_records.py", folder: "Augmentation/Resource_Types/",
+    does: "Downloads OGC API Features records for every resource type in common/config.py, 50 per page with a short delay.",
+    reads: [E("SoilWise OGC API")], writes: [F("data/<Type>_records.json")],
+    flags: ["50 per page", "no DB"] },
+
+  { n: 16, stage: "fetch", script: "fetch_msp_kh_records.py", folder: "Augmentation/Resource_Types/",
+    does: "Exports identifier, title, abstract and resource_type of every record: the MSP side of the comparison.",
+    reads: [V("validate.records")], writes: [F("data/msp-kh-dev.json")],
+    flags: ["read-only on the DB"],
+    warn: "Verified on msp-kh-stage: 33,566 records exported." },
+
+  { n: 17, stage: "compare", script: "compare_msp_vs_ogc_types.py", folder: "Augmentation/Resource_Types/",
+    does: "Matches each MSP record to an OGC feature (identifier → link href → validated title) and writes only the rows where the two types differ.",
+    reads: [F("data/msp-kh-dev.json"), F("data/OGC_records.json")],
+    writes: [F("data/msp_type_mismatches.csv")],
+    flags: ["files only", "no DB"],
+    warn: "OGC_records.json is NOT produced by step 15: it came from notebook 01 in the original repo. Rebuilt from the same OGC API on 2026-11-20 (36,148 features) → 1,988 mismatches." },
+
+  { n: 42, stage: "resolve", script: "resolve_types_from_doi_registries.py", folder: "Augmentation/Resource_Types/",
+    does: "Script version of notebook 05. Extracts the DOI from each mismatch, asks Crossref then DataCite for the registered type, maps both sides to a common class, and sets correct_side to msp, ogc, neither or unresolved.",
+    reads: [F("data/msp_type_mismatches.csv"), E("Crossref / DataCite")],
+    writes: [F("data/msp_type_mismatches_with_correct_type.csv"), F("data/registry_cache.json")],
+    flags: ["--limit", "--email", "--workers", "--infile", "--outfile", "--cache", "no DB"],
+    warn: "Run_pipeline lists it as step 42 because it must run between 17 and 18. Answers are cached in data/registry_cache.json, and entries that previously returned none are retried on every run." },
+
+  { n: 42, stage: "resolve", script: "05_doi_registry_type_resolution.ipynb", folder: "Augmentation/Resource_Types/notebooks/",
+    does: "The notebook the script came from. Cell 2 is a single-record step-by-step inspector that prints every stage of the lookup; cell 4 is the batch resolver; cell 6 is a stale copy of the CLI script.",
+    reads: [F("data/msp_type_mismatches.csv"), E("Crossref / DataCite")],
+    writes: [F("data/msp_type_mismatches_with_correct_type.csv"), F("data/registry_cache.json")],
+    flags: ["cells 2 + 4", "LIMIT = None", "shares the cache with the script"],
+    warn: "Cell 6 cannot compile: DOI_RE uses unescaped quotes inside a raw string, so it dies with SyntaxError before argparse ever runs. Cell 4 still hardcodes EMAIL = you@example.org and LIMIT = None." },
+
+  { n: 18, stage: "apply", script: "update_resource_types_from_ogc.py", folder: "Augmentation/Resource_Types/",
+    does: "For mismatches where the DOI registries confirm the OGC type is right, sets that type in validate.records. Matching is strictly 1-to-1 on identifier.",
+    reads: [F("data/msp_type_mismatches_with_correct_type.csv"), V("validate.records")],
+    writes: [V("validate.records"), V("validate.records_backup_<timestamp>")],
+    flags: ["dry run by default", "--execute", "--no-backup", "--schema"] },
+
+  { n: 19, stage: "apply", script: "resolve_neither_and_unresolved.py", folder: "Augmentation/Resource_Types/",
+    does: "Rule-based types for the leftovers: registry types mapped to the MSP vocabulary, Zenodo Text resolved by genre, EU portal deliverables mapped to Report.",
+    reads: [F("data/msp_type_mismatches_with_correct_type.csv"), V("validate.records")],
+    writes: [V("validate.records"), V("validate.records_backup_<timestamp>"), F("data/msp_type_mismatches_fully_resolved.csv")],
+    flags: ["dry run by default", "--execute", "--identifier", "--no-backup"] },
+];
+
+const TAG = { ext: "src", harvest: "", validate: "", metadata: "", file: "file" };
+let activeStage = "all";
+let activeTable = null;
+
+function chip(item) {
+  const isStore = item.k !== "ext";
+  const el = document.createElement(isStore ? "button" : "span");
+  el.className = "chip k-" + item.k;
+  if (isStore) {
+    el.type = "button";
+    el.title = "Highlight steps that use " + item.n;
+    el.addEventListener("click", () => setTable(activeTable === item.n ? null : item.n));
+  }
+  const s = document.createElement("span");
+  s.textContent = item.n;
+  el.appendChild(s);
+  return el;
+}
+
+function ioCol(label, items) {
+  const col = document.createElement("div");
+  col.className = "io";
+  const l = document.createElement("div");
+  l.className = "label"; l.textContent = label;
+  col.appendChild(l);
+  if (!items.length) {
+    const none = document.createElement("span");
+    none.className = "folder"; none.textContent = "nothing";
+    col.appendChild(none);
+  }
+  items.forEach(i => col.appendChild(chip(i)));
+  return col;
+}
+
+function arrow() {
+  const a = document.createElement("div");
+  a.className = "flow"; a.setAttribute("aria-hidden", "true"); a.textContent = "→";
+  return a;
+}
+
+function renderSteps() {
+  const root = document.getElementById("steps");
+  root.innerHTML = "";
+  STAGES.forEach(st => {
+    const steps = STEPS.filter(s => s.stage === st.id);
+    const g = document.createElement("div");
+    g.className = "stage"; g.dataset.stage = st.id;
+    g.hidden = activeStage !== "all" && activeStage !== st.id;
+    const t = document.createElement("div");
+    t.className = "stage-title";
+    t.innerHTML = `<h2></h2><span></span>`;
+    t.querySelector("h2").textContent = st.name;
+    t.querySelector("span").textContent = st.hint;
+    g.appendChild(t);
+    steps.forEach(s => {
+      const row = document.createElement("article");
+      row.className = "step";
+      const touches = [...s.reads, ...s.writes].some(i => i.n === activeTable);
+      if (activeTable && !touches) row.classList.add("dim");
+      const proc = document.createElement("div");
+      proc.className = "proc";
+      proc.innerHTML = `<div class="proc-top"><span class="num"></span><h3></h3></div><div class="folder"></div><p></p>`;
+      proc.querySelector(".num").textContent = String(s.n).padStart(2, "0");
+      proc.querySelector("h3").textContent = s.script;
+      proc.querySelector(".folder").textContent = s.folder;
+      proc.querySelector("p").textContent = s.does;
+      if (s.flags && s.flags.length) {
+        const f = document.createElement("div"); f.className = "flags";
+        s.flags.forEach(x => { const c = document.createElement("code"); c.textContent = x; f.appendChild(c); });
+        proc.appendChild(f);
+      }
+      if (s.warn) {
+        const w = document.createElement("div"); w.className = "warn"; w.textContent = "⚠ " + s.warn;
+        proc.appendChild(w);
+      }
+      row.append(ioCol("Reads", s.reads), arrow(), proc, arrow(), ioCol("Writes", s.writes));
+      g.appendChild(row);
+    });
+    root.appendChild(g);
+  });
+  const note = document.getElementById("filterNote");
+  if (activeTable) {
+    const n = STEPS.filter(s => [...s.reads, ...s.writes].some(i => i.n === activeTable)).length;
+    note.hidden = false;
+    note.innerHTML = "";
+    const txt = document.createElement("span");
+    txt.innerHTML = `Highlighting <code></code>: ${n} step${n === 1 ? "" : "s"}.`;
+    txt.querySelector("code").textContent = activeTable;
+    const clear = document.createElement("button");
+    clear.type = "button"; clear.textContent = "Clear highlight";
+    clear.addEventListener("click", () => setTable(null));
+    note.append(txt, clear);
+  } else {
+    note.hidden = true;
+  }
+}
+
+function setTable(name) { activeTable = name; renderSteps(); }
+
+function renderFilters() {
+  const box = document.getElementById("stageFilters");
+  const opts = [{ id: "all", name: "All stages" }, ...STAGES];
+  opts.forEach(o => {
+    const b = document.createElement("button");
+    b.type = "button"; b.id = "stage-" + o.id; b.textContent = o.name;
+    b.setAttribute("aria-pressed", String(o.id === activeStage));
+    b.addEventListener("click", () => {
+      activeStage = o.id;
+      box.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x.id === "stage-" + o.id)));
+      renderSteps();
+    });
+    box.appendChild(b);
+  });
+}
+
+function renderIndex() {
+  const map = new Map();
+  const order = { harvest: 0, file: 3, validate: 1, metadata: 2 };
+  STEPS.forEach(s => {
+    s.writes.forEach(i => { if (i.k === "ext") return; const e = map.get(i.n) || { k: i.k, w: [], r: [] }; e.w.push(s); map.set(i.n, e); });
+    s.reads.forEach(i => { if (i.k === "ext") return; const e = map.get(i.n) || { k: i.k, w: [], r: [] }; e.r.push(s); map.set(i.n, e); });
+  });
+  const rows = [...map.entries()].sort((a, b) => (order[a[1].k] - order[b[1].k]) || a[0].localeCompare(b[0]));
+  const tb = document.getElementById("index");
+  rows.forEach(([name, e]) => {
+    const tr = document.createElement("tr");
+    const td0 = document.createElement("td"); td0.appendChild(chip({ k: e.k, n: name }));
+    const refs = (list) => {
+      const td = document.createElement("td");
+      const d = document.createElement("div"); d.className = "refs";
+      if (!list.length) { d.textContent = "none"; }
+      list.forEach(s => { const sp = document.createElement("span"); sp.innerHTML = `<b></b> `; sp.querySelector("b").textContent = s.n; sp.append(s.script); d.appendChild(sp); });
+      td.appendChild(d); return td;
+    };
+    tr.append(td0, refs(e.w), refs(e.r));
+    tb.appendChild(tr);
+  });
+}
+
+renderFilters();
+renderSteps();
+renderIndex();
+</script>
